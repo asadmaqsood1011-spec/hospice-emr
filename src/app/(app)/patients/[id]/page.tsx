@@ -1,12 +1,22 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
+import { can } from "@/lib/rbac";
 import { fullName, ageFrom } from "@/lib/utils";
 import { ESASChart } from "@/components/esas-chart";
 import { PPSChart } from "@/components/pps-chart";
 import { VoiceNoteRecorder } from "@/components/voice-note-recorder";
+import { FamilyLetter } from "@/components/family-letter";
+import { InteractionsPanel } from "@/components/interactions-panel";
+import { PatientActions } from "@/components/patient-actions";
+import { PatientClinicalForms } from "@/components/patient-clinical-forms";
+import { PhotoUpload } from "@/components/photo-upload";
+import { RecentPatientTracker } from "@/components/recent-patients";
+import { SummaryCard } from "@/components/summary-card";
+import { VisitTimer } from "@/components/visit-timer";
 
 export default async function PatientPage({
   params,
@@ -15,6 +25,18 @@ export default async function PatientPage({
 }) {
   const session = await auth();
   const { id } = await params;
+
+  // Check soft-delete + break-glass gate
+  const lite = await prisma.patient.findUnique({
+    where: { id },
+    select: { id: true, lockbox: true, deletedAt: true },
+  });
+  if (!lite) notFound();
+  if (lite.deletedAt) notFound();
+  if (lite.lockbox) {
+    const cookieStore = await cookies();
+    if (!cookieStore.get(`bg-${id}`)) redirect(`/break-glass/${id}`);
+  }
 
   const patient = await prisma.patient.findUnique({
     where: { id },
@@ -29,6 +51,7 @@ export default async function PatientPage({
         take: 10,
         include: { author: { select: { name: true, role: true } } },
       },
+      photos: { orderBy: { takenAt: "desc" }, take: 6 },
     },
   });
 
@@ -47,6 +70,7 @@ export default async function PatientPage({
 
   return (
     <div className="space-y-6">
+      <RecentPatientTracker patient={{ id: patient.id, name: fullName(patient), mrn: patient.mrn }} />
       <div className="flex items-start justify-between">
         <div>
           <Link href="/patients" className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline">
@@ -59,6 +83,12 @@ export default async function PatientPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <a
+            href={`/api/patients/${patient.id}/export?format=pdf`}
+            className="border border-stone-300 text-slate-800 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-100 transition-colors"
+          >
+            PDF
+          </a>
           <a
             href="#voice-recorder"
             className="bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-800 shadow-sm transition-colors"
@@ -171,6 +201,18 @@ export default async function PatientPage({
         </div>
       </div>
 
+      <PatientClinicalForms
+        patientId={patient.id}
+        canAddMedication={can(session?.user.role, "med.prescribe")}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+          <SummaryCard patientId={patient.id} />
+        </div>
+        <VisitTimer patientId={patient.id} />
+      </div>
+
       {/* Charts */}
       {patient.esasScores.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -225,6 +267,37 @@ export default async function PatientPage({
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-slate-900 mb-3">Drug Interaction Check</h2>
+          <InteractionsPanel patientId={patient.id} />
+        </div>
+        <PatientActions patientId={patient.id} isAdmin={session?.user.role === "ADMIN"} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+          <FamilyLetter patientId={patient.id} />
+        </div>
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Photos</h2>
+          </div>
+          <PhotoUpload patientId={patient.id} />
+          {patient.photos.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {patient.photos.map((photo) => (
+                <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.url} alt={photo.caption ?? photo.filename} className="aspect-square w-full object-cover rounded-lg border border-stone-200" />
+                  <div className="mt-1 text-xs text-slate-600 truncate">{photo.caption ?? photo.filename}</div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Recent notes */}

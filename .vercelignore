@@ -1,0 +1,11 @@
+.env
+.env.*
+.next
+node_modules
+hospice-dev.log
+hospice-dev.err.log
+*.log
+audit-archives
+backups
+coverage
+tsconfig.tsbuildinfo

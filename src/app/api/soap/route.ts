@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
 import { auth } from "@/auth";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getOpenAI } from "@/lib/openai";
 
 const Body = z.object({
   transcript: z.string().min(1),
@@ -31,7 +29,7 @@ Output JSON ONLY with this shape:
   },
   "pps": <0-100 in increments of 10 or null>,
   "medChanges": ["Increased morphine 10mg to 15mg q4h", ...],
-  "icd10": ["C78.7", ...],
+  "icd10": [{ "code": "C78.7", "confidence": 0.92 }, ...],
   "confidence": <0.0-1.0, how confident you are in the structure>
 }
 
@@ -39,7 +37,7 @@ Rules:
 - Use null for ESAS items not mentioned. Do NOT invent scores.
 - PPS is on 0,10,20,...100 scale (Palliative Performance Scale). Null if not stated.
 - Medication changes: dose adjustments, new meds, discontinuations.
-- ICD-10: only codes clearly supported by the transcript.
+- ICD-10: only codes clearly supported by the transcript. Include per-code confidence.
 - If transcript is ambiguous, lower confidence.
 - Never fabricate vital signs, names, or numbers not in the transcript.`;
 
@@ -52,7 +50,7 @@ export async function POST(req: Request) {
 
   const { transcript } = parsed.data;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     response_format: { type: "json_object" },
     temperature: 0.2,

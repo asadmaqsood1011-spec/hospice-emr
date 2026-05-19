@@ -18,6 +18,7 @@ export default async function LoginPage({
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
+        totp: formData.get("totp"),
         redirectTo: "/patients",
       });
     } catch (err) {
@@ -72,6 +73,23 @@ export default async function LoginPage({
               autoComplete="current-password"
               minLength={8}
               className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="totp" className="block text-sm font-semibold text-slate-800 mb-1.5">
+              2FA Code <span className="font-normal text-slate-500">(if enabled)</span>
+            </label>
+            <input
+              id="totp"
+              name="totp"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              placeholder="123456"
+              autoComplete="one-time-code"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
             />
           </div>
 

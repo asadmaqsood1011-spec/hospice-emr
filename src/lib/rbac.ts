@@ -25,7 +25,7 @@ const PERMS: Record<Role, Permission[]> = {
     "med.prescribe",
   ],
   RN: [
-    "patient.read", "patient.update",
+    "patient.read", "patient.create", "patient.update",
     "note.read", "note.create", "note.sign",
   ],
   SW: ["patient.read", "note.read", "note.create", "note.sign"],

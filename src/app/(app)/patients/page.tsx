@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { fullName, ageFrom } from "@/lib/utils";
+import { SearchShortcut } from "@/components/search-shortcut";
 
 export default async function PatientsPage({
   searchParams,
@@ -12,15 +13,18 @@ export default async function PatientsPage({
   const session = await auth();
   const { q } = await searchParams;
 
-  const where = q
-    ? {
-        OR: [
-          { firstName: { contains: q, mode: "insensitive" as const } },
-          { lastName: { contains: q, mode: "insensitive" as const } },
-          { mrn: { contains: q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    deletedAt: null,
+    ...(q
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: "insensitive" as const } },
+            { lastName: { contains: q, mode: "insensitive" as const } },
+            { mrn: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const patients = await prisma.patient.findMany({
     where,
@@ -63,12 +67,14 @@ export default async function PatientsPage({
 
       <form className="mb-4">
         <input
+          id="patient-search"
           type="search"
           name="q"
           defaultValue={q ?? ""}
           placeholder="Search by name or MRN..."
           className="w-full md:w-80 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
         />
+        <SearchShortcut inputId="patient-search" />
       </form>
 
       <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">

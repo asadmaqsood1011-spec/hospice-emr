@@ -89,7 +89,7 @@ export function OnlineStatus() {
           onClick={manualSync}
           disabled={syncing}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
-          title="Click to sync now"
+          title="Sync now"
         >
           {syncing ? "Syncing..." : `${pending} pending`}
         </button>

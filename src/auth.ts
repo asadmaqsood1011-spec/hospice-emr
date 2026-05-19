@@ -3,11 +3,13 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { verifyToken } from "@/lib/totp";
 import type { Role } from "@/generated/prisma";
 
 const CredsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  totp: z.string().optional(),
 });
 
 const IDLE_MIN = Number(process.env.SESSION_IDLE_TIMEOUT_MIN ?? "15");
@@ -27,6 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totp: { label: "TOTP", type: "text" },
       },
       authorize: async (creds) => {
         const parsed = CredsSchema.safeParse(creds);
@@ -39,6 +42,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!ok) return null;
+
+        if (user.totpEnabled) {
+          const code = (parsed.data.totp ?? "").trim();
+          if (!code || !user.totpSecret) return null;
+          if (!verifyToken(code, user.totpSecret)) return null;
+        }
 
         await prisma.user.update({
           where: { id: user.id },

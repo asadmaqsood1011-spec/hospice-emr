@@ -66,16 +66,19 @@ enum AuditAction {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  role         Role
-  active       Boolean   @default(true)
-  totpSecret   String?
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  role            Role
+  active          Boolean   @default(true)
+  totpSecret      String?
+  totpEnabled     Boolean   @default(false)
+  oncallPhone     String? // SMS alerts
+  icsToken        String?   @unique // private calendar feed token
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   visits    Visit[]
   notes     Note[]
@@ -102,7 +105,11 @@ model Patient {
   deceasedAt    DateTime?
   consentOnFile Boolean       @default(false)
   lockbox       Boolean       @default(false)
+  preferredLang String? // e.g. "en", "pa" (Punjabi), "tl" (Tagalog)
   notes         String?
+  deletedAt     DateTime? // soft delete for right-to-erasure
+  deletedById   String?
+  deletedReason String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -114,6 +121,8 @@ model Patient {
   ppsScores     PPS[]
   contacts      Caregiver[]
   auditLogs     AuditLog[]
+  photos        Photo[]
+  faxes         Fax[]
 }
 
 model Caregiver {
@@ -142,6 +151,7 @@ model Medication {
   patientId      String
   patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   name           String
+  rxcui          String? // RxNorm Concept Unique Identifier
   dose           String
   route          String?
   frequency      String?
@@ -174,26 +184,29 @@ model Visit {
 }
 
 model Note {
-  id           String    @id @default(cuid())
-  visitId      String?   @unique
-  visit        Visit?    @relation(fields: [visitId], references: [id])
-  patientId    String
-  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  authorId     String
-  author       User      @relation(fields: [authorId], references: [id])
-  rawAudioUrl  String?
-  transcript   String?
-  subjective   String?
-  objective    String?
-  assessment   String?
-  plan         String?
-  aiDraft      Json?
-  aiModel      String?
-  aiConfidence Float?
-  signed       Boolean   @default(false)
-  signedAt     DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  visitId          String?   @unique
+  visit            Visit?    @relation(fields: [visitId], references: [id])
+  patientId        String
+  patient          Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId         String
+  author           User      @relation(fields: [authorId], references: [id])
+  rawAudioUrl      String?
+  language         String? // BCP-47 language code, e.g. "en", "pa", "tl"
+  transcript       String? // English (translated if needed)
+  transcriptOrig   String? // original language transcript
+  subjective       String?
+  objective        String?
+  assessment       String?
+  plan             String?
+  icd10Codes       Json? // [{ code: "C25.9", confidence: 0.92 }]
+  aiDraft          Json?
+  aiModel          String?
+  aiConfidence     Float?
+  signed           Boolean   @default(false)
+  signedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model ESAS {
@@ -227,6 +240,40 @@ model PPS {
   consciousness String?
   recordedAt    DateTime @default(now())
   recordedById  String?
+}
+
+model Photo {
+  id         String   @id @default(cuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  filename   String
+  url        String
+  caption    String?
+  takenAt    DateTime @default(now())
+  uploadedBy String?
+  mimeType   String
+  bytes      Int
+  createdAt  DateTime @default(now())
+
+  @@index([patientId, takenAt])
+}
+
+model Fax {
+  id          String   @id @default(cuid())
+  patientId   String?
+  patient     Patient? @relation(fields: [patientId], references: [id])
+  direction   String // "inbound" | "outbound"
+  from        String?
+  to          String?
+  pages       Int?
+  status      String? // received | pending-link | reviewed
+  pdfUrl      String?
+  twilioSid   String?
+  receivedAt  DateTime @default(now())
+  reviewedBy  String?
+  reviewedAt  DateTime?
+
+  @@index([receivedAt])
 }
 
 model AuditLog {

@@ -12,14 +12,29 @@ type SoapDraft = {
   esas?: Record<string, number | null>;
   pps?: number | null;
   medChanges?: string[];
-  icd10?: string[];
+  icd10?: Array<string | { code: string; confidence?: number }>;
   confidence?: number;
 };
+
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "pa", label: "Punjabi" },
+  { code: "tl", label: "Tagalog" },
+  { code: "fr", label: "Français" },
+  { code: "es", label: "Español" },
+  { code: "zh", label: "中文" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ar", label: "العربية" },
+  { code: "ur", label: "اردو" },
+];
 
 export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<"idle" | "transcribing" | "structuring" | "saving">("idle");
   const [transcript, setTranscript] = useState("");
+  const [transcriptOriginal, setTranscriptOriginal] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [visitType, setVisitType] = useState("RN_VISIT");
   const [draft, setDraft] = useState<SoapDraft | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -54,10 +69,12 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
     try {
       const fd = new FormData();
       fd.append("audio", blob, "note.webm");
+      fd.append("language", language);
       const tRes = await fetch("/api/transcribe", { method: "POST", body: fd });
       if (!tRes.ok) throw new Error("Transcription failed");
-      const { transcript: txt } = await tRes.json();
+      const { transcript: txt, transcriptOriginal: orig } = await tRes.json();
       setTranscript(txt);
+      setTranscriptOriginal(orig ?? "");
 
       setBusy("structuring");
       const sRes = await fetch("/api/soap", {
@@ -80,12 +97,22 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
     if (!draft) return;
     setBusy("saving");
 
-    const payload = { patientId, transcript, ...draft, sign };
+    const payload = {
+      patientId,
+      transcript,
+      transcriptOriginal,
+      language,
+      visitType,
+      ...getVisitTiming(patientId),
+      ...draft,
+      sign,
+    };
 
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       await queueNote({ ...payload, sign });
       window.dispatchEvent(new Event("outbox-changed"));
       toast.success("Offline — note queued, will sync when online");
+      clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
       setBusy("idle");
@@ -100,6 +127,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       });
       if (!res.ok) throw new Error("Save failed");
       toast.success(sign ? "Note signed" : "Note saved as draft");
+      clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
       window.location.reload();
@@ -108,6 +136,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       await queueNote({ ...payload, sign });
       window.dispatchEvent(new Event("outbox-changed"));
       toast.warning(`Save failed (${(e as Error).message}) — queued for sync`);
+      clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
     } finally {
@@ -117,7 +146,36 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          disabled={recording || busy !== "idle"}
+          className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
+          aria-label="Recording language"
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={visitType}
+          onChange={(e) => setVisitType(e.target.value)}
+          disabled={recording || busy !== "idle"}
+          className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
+          aria-label="Visit type"
+        >
+          <option value="RN_VISIT">RN visit</option>
+          <option value="MD_VISIT">MD visit</option>
+          <option value="SW_VISIT">SW visit</option>
+          <option value="CHAPLAIN_VISIT">Chaplain visit</option>
+          <option value="AIDE_VISIT">Aide visit</option>
+          <option value="VOLUNTEER_VISIT">Volunteer visit</option>
+          <option value="IDG_MEETING">IDG meeting</option>
+          <option value="PHONE">Phone</option>
+        </select>
         {!recording ? (
           <button
             type="button"
@@ -148,9 +206,21 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       </div>
 
       {transcript && (
-        <div className="bg-slate-50 rounded-lg p-3 text-sm">
-          <div className="text-xs text-slate-500 mb-1">Raw transcript</div>
-          <div className="text-slate-700">{transcript}</div>
+        <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-2">
+          <div>
+            <div className="text-xs text-slate-500 mb-1">Transcript (English)</div>
+            <div className="text-slate-700">{transcript}</div>
+          </div>
+          {transcriptOriginal && transcriptOriginal !== transcript && (
+            <div className="pt-2 border-t border-slate-200">
+              <div className="text-xs text-slate-500 mb-1">
+                Original ({LANGUAGES.find((l) => l.code === language)?.label})
+              </div>
+              <div className="text-slate-700" dir={["ar", "ur"].includes(language) ? "rtl" : "ltr"}>
+                {transcriptOriginal}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -190,7 +260,22 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
                 <div>Med changes: {draft.medChanges.join("; ")}</div>
               )}
               {draft.icd10 && draft.icd10.length > 0 && (
-                <div>ICD-10: {draft.icd10.join(", ")}</div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">ICD-10 codes</label>
+                  <input
+                    value={draft.icd10.map(formatIcd10).join(", ")}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        icd10: e.target.value
+                          .split(",")
+                          .map((v) => v.replace(/\([^)]*\)/g, "").trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-xs font-mono border border-slate-200 rounded bg-white"
+                  />
+                </div>
               )}
               {draft.confidence !== undefined && (
                 <div>Confidence: {Math.round((draft.confidence ?? 0) * 100)}%</div>
@@ -244,4 +329,34 @@ function SoapField({
       />
     </div>
   );
+}
+
+function formatIcd10(value: string | { code: string; confidence?: number }) {
+  if (typeof value === "string") return value;
+  if (typeof value.confidence === "number") {
+    return `${value.code} (${Math.round(value.confidence * 100)}%)`;
+  }
+  return value.code;
+}
+
+function timerKey(patientId: string) {
+  return `hospice-emr-visit-timer-${patientId}`;
+}
+
+function getVisitTiming(patientId: string) {
+  if (typeof window === "undefined") return {};
+  const stored = localStorage.getItem(timerKey(patientId));
+  if (!stored) return {};
+  const started = Number(stored);
+  if (!Number.isFinite(started)) return {};
+  return {
+    visitStartedAt: new Date(started).toISOString(),
+    visitDurationMin: Math.max(1, Math.round((Date.now() - started) / 60000)),
+  };
+}
+
+function clearVisitTimer(patientId: string) {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(timerKey(patientId));
+  window.dispatchEvent(new Event("visit-timer-changed"));
 }

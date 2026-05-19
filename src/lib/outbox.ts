@@ -5,7 +5,13 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 export type OutboxNote = {
   id?: number;
   patientId: string;
+  visitId?: string;
+  visitType?: string;
+  visitDurationMin?: number;
+  visitStartedAt?: string;
   transcript?: string;
+  transcriptOriginal?: string;
+  language?: string;
   subjective?: string;
   objective?: string;
   assessment?: string;
@@ -13,7 +19,7 @@ export type OutboxNote = {
   esas?: Record<string, number | null> | null;
   pps?: number | null;
   medChanges?: string[];
-  icd10?: string[];
+  icd10?: Array<string | { code: string; confidence?: number }>;
   confidence?: number;
   sign: boolean;
   audioBlob?: Blob;

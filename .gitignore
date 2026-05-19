@@ -41,3 +41,14 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+.vercel
+
+# dev server logs
+hospice-dev.log
+hospice-dev.err.log
+*.log
+
+# local artifacts
+audit-archives/
+backups/

@@ -35,7 +35,13 @@ export async function flushOutbox(): Promise<SyncResult> {
 function serializeForApi(n: OutboxNote) {
   return {
     patientId: n.patientId,
+    visitId: n.visitId,
+    visitType: n.visitType,
+    visitDurationMin: n.visitDurationMin,
+    visitStartedAt: n.visitStartedAt,
     transcript: n.transcript,
+    transcriptOriginal: n.transcriptOriginal,
+    language: n.language,
     subjective: n.subjective,
     objective: n.objective,
     assessment: n.assessment,

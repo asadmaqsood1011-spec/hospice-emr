@@ -2,6 +2,8 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
+import { VisitScheduler } from "@/components/visit-scheduler";
+import { endVisit, startVisit } from "./actions";
 
 export default async function VisitsPage({
   searchParams,
@@ -14,19 +16,26 @@ export default async function VisitsPage({
   const sinceDays = Number(days ?? "7");
   const since = new Date(Date.now() - sinceDays * 86400000);
 
-  const visits = await prisma.visit.findMany({
+  const [patients, visits] = await Promise.all([
+    prisma.patient.findMany({
+      where: { status: "ACTIVE", deletedAt: null },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: { id: true, firstName: true, lastName: true, mrn: true },
+    }),
+    prisma.visit.findMany({
     where: {
-      startedAt: { gte: since },
+      OR: [{ startedAt: { gte: since } }, { scheduledFor: { gte: since } }],
       ...(type ? { type: type as never } : {}),
     },
-    orderBy: { startedAt: "desc" },
+    orderBy: [{ scheduledFor: "asc" }, { startedAt: "desc" }],
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, mrn: true } },
       provider: { select: { name: true, role: true } },
       note: { select: { signed: true, assessment: true } },
     },
     take: 100,
-  });
+    }),
+  ]);
 
   await audit({
     userId: session?.user.id,
@@ -36,7 +45,7 @@ export default async function VisitsPage({
   });
 
   return (
-    <div>
+    <div className="space-y-5">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Visits</h1>
@@ -45,6 +54,13 @@ export default async function VisitsPage({
           </p>
         </div>
       </div>
+
+      <VisitScheduler
+        patients={patients.map((p) => ({
+          id: p.id,
+          label: `${p.lastName}, ${p.firstName} (${p.mrn})`,
+        }))}
+      />
 
       <form className="mb-4 flex gap-2 flex-wrap">
         <select
@@ -96,7 +112,8 @@ export default async function VisitsPage({
             {visits.map((v) => (
               <tr key={v.id} className="hover:bg-teal-50 transition-colors">
                 <td className="px-4 py-3 text-xs font-mono text-slate-700">
-                  {new Date(v.startedAt).toLocaleString()}
+                  {new Date(v.scheduledFor ?? v.startedAt).toLocaleString()}
+                  {v.durationMin && <div className="text-slate-500">{v.durationMin} min</div>}
                 </td>
                 <td className="px-4 py-3">
                   <Link
@@ -120,7 +137,27 @@ export default async function VisitsPage({
                   {v.note?.assessment ?? <span className="text-slate-400">—</span>}
                 </td>
                 <td className="px-4 py-3">
-                  {v.signed ? (
+                  {statusFor(v) === "scheduled" ? (
+                    <div className="flex gap-2">
+                      <Status label="Scheduled" className="text-sky-800 bg-sky-100 border-sky-200" />
+                      <form action={startVisit}>
+                        <input type="hidden" name="visitId" value={v.id} />
+                        <button type="submit" className="text-xs font-bold text-teal-800 bg-teal-100 border border-teal-200 px-2 py-1 rounded">
+                          Start
+                        </button>
+                      </form>
+                    </div>
+                  ) : statusFor(v) === "active" ? (
+                    <div className="flex gap-2">
+                      <Status label="Active" className="text-amber-800 bg-amber-100 border-amber-200" />
+                      <form action={endVisit}>
+                        <input type="hidden" name="visitId" value={v.id} />
+                        <button type="submit" className="text-xs font-bold text-slate-800 bg-stone-200 border border-stone-300 px-2 py-1 rounded">
+                          End
+                        </button>
+                      </form>
+                    </div>
+                  ) : v.signed ? (
                     <span className="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded">
                       Signed
                     </span>
@@ -148,4 +185,14 @@ export default async function VisitsPage({
       </div>
     </div>
   );
+}
+
+function Status({ label, className }: { label: string; className: string }) {
+  return <span className={`text-xs font-bold px-2 py-1 rounded border ${className}`}>{label}</span>;
+}
+
+function statusFor(v: { scheduledFor: Date | null; endedAt: Date | null; note: unknown }) {
+  if (v.endedAt || v.note) return "complete";
+  if (v.scheduledFor && v.scheduledFor.getTime() >= Date.now()) return "scheduled";
+  return "active";
 }

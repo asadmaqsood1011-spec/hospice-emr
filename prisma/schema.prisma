@@ -1,0 +1,250 @@
+// Hospice EMR — PHIPA-aware schema
+// Single-clinic deployment, voice-first SOAP workflow.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MD
+  RN
+  SW
+  CHAPLAIN
+  AIDE
+  VOLUNTEER
+}
+
+enum CodeStatus {
+  FULL
+  DNR
+  DNI
+  DNR_DNI
+  COMFORT_ONLY
+}
+
+enum LevelOfCare {
+  ROUTINE
+  CONTINUOUS
+  INPATIENT_RESPITE
+  GENERAL_INPATIENT
+}
+
+enum VisitType {
+  RN_VISIT
+  MD_VISIT
+  SW_VISIT
+  CHAPLAIN_VISIT
+  AIDE_VISIT
+  VOLUNTEER_VISIT
+  IDG_MEETING
+  PHONE
+}
+
+enum PatientStatus {
+  ACTIVE
+  DISCHARGED
+  DECEASED
+  REVOKED
+}
+
+enum AuditAction {
+  READ
+  CREATE
+  UPDATE
+  DELETE
+  EXPORT
+  LOGIN
+  LOGOUT
+  BREAK_GLASS
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role
+  active       Boolean   @default(true)
+  totpSecret   String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  visits    Visit[]
+  notes     Note[]
+  auditLogs AuditLog[]
+}
+
+model Patient {
+  id            String        @id @default(cuid())
+  mrn           String        @unique
+  firstName     String
+  lastName      String
+  dob           DateTime
+  sex           String?
+  phone         String?
+  address       String?
+  status        PatientStatus @default(ACTIVE)
+  codeStatus    CodeStatus    @default(FULL)
+  levelOfCare   LevelOfCare   @default(ROUTINE)
+  primaryDxIcd  String?
+  primaryDx     String?
+  prognosisMo   Int?
+  admittedAt    DateTime      @default(now())
+  dischargedAt  DateTime?
+  deceasedAt    DateTime?
+  consentOnFile Boolean       @default(false)
+  lockbox       Boolean       @default(false)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  allergies     Allergy[]
+  meds          Medication[]
+  visits        Visit[]
+  clinicalNotes Note[]
+  esasScores    ESAS[]
+  ppsScores     PPS[]
+  contacts      Caregiver[]
+  auditLogs     AuditLog[]
+}
+
+model Caregiver {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name         String
+  relationship String?
+  phone        String?
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model Allergy {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  substance String
+  reaction  String?
+  severity  String?
+  createdAt DateTime @default(now())
+}
+
+model Medication {
+  id             String    @id @default(cuid())
+  patientId      String
+  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name           String
+  dose           String
+  route          String?
+  frequency      String?
+  indication     String?
+  controlled     Boolean   @default(false)
+  startedAt      DateTime  @default(now())
+  discontinuedAt DateTime?
+  prescriberId   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Visit {
+  id           String    @id @default(cuid())
+  patientId    String
+  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerId   String
+  provider     User      @relation(fields: [providerId], references: [id])
+  type         VisitType
+  scheduledFor DateTime?
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  durationMin  Int?
+  location     String?
+  signed       Boolean   @default(false)
+  signedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  note Note?
+}
+
+model Note {
+  id           String    @id @default(cuid())
+  visitId      String?   @unique
+  visit        Visit?    @relation(fields: [visitId], references: [id])
+  patientId    String
+  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User      @relation(fields: [authorId], references: [id])
+  rawAudioUrl  String?
+  transcript   String?
+  subjective   String?
+  objective    String?
+  assessment   String?
+  plan         String?
+  aiDraft      Json?
+  aiModel      String?
+  aiConfidence Float?
+  signed       Boolean   @default(false)
+  signedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model ESAS {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  pain         Int
+  tiredness    Int
+  drowsiness   Int
+  nausea       Int
+  appetite     Int
+  shortBreath  Int
+  depression   Int
+  anxiety      Int
+  wellbeing    Int
+  other        String?
+  otherScore   Int?
+  recordedAt   DateTime @default(now())
+  recordedById String?
+}
+
+model PPS {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  score         Int
+  ambulation    String?
+  activity      String?
+  selfCare      String?
+  intake         String?
+  consciousness String?
+  recordedAt    DateTime @default(now())
+  recordedById  String?
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  patientId  String?
+  patient    Patient?    @relation(fields: [patientId], references: [id])
+  action     AuditAction
+  resource   String
+  resourceId String?
+  reason     String?
+  ip         String?
+  userAgent  String?
+  metadata   Json?
+  ts         DateTime    @default(now())
+
+  @@index([patientId, ts])
+  @@index([userId, ts])
+  @@index([ts])
+}

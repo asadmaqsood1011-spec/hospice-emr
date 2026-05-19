@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { OnlineStatus } from "@/components/online-status";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -10,30 +11,32 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/patients" className="font-semibold text-slate-900">
+      <header className="bg-white border-b-2 border-stone-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/patients" className="flex items-center gap-2 font-bold text-slate-900">
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-teal-700 text-white text-sm">H</span>
               Hospice EMR
             </Link>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/patients" className="text-slate-600 hover:text-slate-900">
+            <nav className="flex items-center gap-1 text-sm font-medium">
+              <Link href="/patients" className="text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
                 Patients
               </Link>
-              <Link href="/visits" className="text-slate-600 hover:text-slate-900">
+              <Link href="/visits" className="text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
                 Visits
               </Link>
               {user.role === "ADMIN" && (
-                <Link href="/audit" className="text-slate-600 hover:text-slate-900">
+                <Link href="/audit" className="text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
                   Audit
                 </Link>
               )}
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <OnlineStatus />
             <div className="text-right text-sm">
-              <div className="font-medium text-slate-900">{user.name}</div>
-              <div className="text-xs text-slate-500">{user.role}</div>
+              <div className="font-semibold text-slate-900">{user.name}</div>
+              <div className="text-xs font-medium text-teal-700">{user.role}</div>
             </div>
             <form
               action={async () => {
@@ -43,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               <button
                 type="submit"
-                className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded border border-slate-200"
+                className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 transition-colors"
               >
                 Sign out
               </button>
@@ -52,9 +55,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">{children}</main>
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 text-xs text-slate-500 flex justify-between">
-          <span>PHIPA-aware · Audit-logged · Session 15 min idle</span>
+      <footer className="border-t border-stone-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 text-xs text-slate-600 flex justify-between">
+          <span className="font-medium">PHIPA-aware · Audit-logged · Session 15 min idle</span>
           <span>All access is recorded</span>
         </div>
       </footer>

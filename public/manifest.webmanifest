@@ -1,0 +1,25 @@
+{
+  "name": "Hospice EMR",
+  "short_name": "Hospice EMR",
+  "description": "Voice-first EMR for hospice care. PHIPA-aware.",
+  "start_url": "/patients",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#0f766e",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

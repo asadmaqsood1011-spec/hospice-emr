@@ -49,22 +49,22 @@ export default async function PatientPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <Link href="/patients" className="text-sm text-slate-500 hover:text-slate-900">
+          <Link href="/patients" className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline">
             ← All patients
           </Link>
-          <h1 className="text-2xl font-semibold text-slate-900 mt-1">{fullName(patient)}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            MRN {patient.mrn} · {ageFrom(patient.dob)}y · {patient.sex ?? "—"} ·{" "}
-            <span className="text-amber-700 font-medium">{patient.codeStatus.replace(/_/g, "/")}</span>
+          <h1 className="text-3xl font-bold text-slate-900 mt-1">{fullName(patient)}</h1>
+          <p className="text-sm font-medium text-slate-700 mt-1">
+            MRN <span className="font-mono">{patient.mrn}</span> · {ageFrom(patient.dob)}y · {patient.sex ?? "—"} ·{" "}
+            <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">{patient.codeStatus.replace(/_/g, "/")}</span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Link
-            href={`/patients/${patient.id}/visit/new`}
-            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"
+          <a
+            href="#voice-recorder"
+            className="bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-800 shadow-sm transition-colors"
           >
-            + New Visit
-          </Link>
+            🎤 Record Note
+          </a>
         </div>
       </div>
 
@@ -76,8 +76,8 @@ export default async function PatientPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Overview card */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+          <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">
             Overview
           </h2>
           <Row label="Primary Dx" value={patient.primaryDx ?? "—"} />
@@ -92,8 +92,8 @@ export default async function PatientPage({
         </div>
 
         {/* Latest scores */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+          <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">
             Latest Scores
           </h2>
           {latestPps ? (
@@ -126,9 +126,9 @@ export default async function PatientPage({
         </div>
 
         {/* Allergies + Caregivers */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
               Allergies
             </h2>
             {patient.allergies.length === 0 ? (
@@ -145,7 +145,7 @@ export default async function PatientPage({
             )}
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
               Caregivers
             </h2>
             {patient.contacts.length === 0 ? (
@@ -174,28 +174,28 @@ export default async function PatientPage({
       {/* Charts */}
       {patient.esasScores.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">ESAS Trend</h2>
+          <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-slate-900 mb-3">ESAS Trend</h2>
             <ESASChart data={patient.esasScores} />
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">PPS Trend</h2>
+          <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-slate-900 mb-3">PPS Trend</h2>
             <PPSChart data={patient.ppsScores} />
           </div>
         </div>
       )}
 
       {/* Voice note recorder */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">
+      <div id="voice-recorder" className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 scroll-mt-20">
+        <h2 className="text-sm font-bold text-slate-900 mb-3">
           🎤 Voice Note → SOAP
         </h2>
         <VoiceNoteRecorder patientId={patient.id} />
       </div>
 
       {/* Medications */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">
+      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+        <h2 className="text-sm font-bold text-slate-900 mb-3">
           Active Medications ({patient.meds.length})
         </h2>
         {patient.meds.length === 0 ? (
@@ -228,8 +228,8 @@ export default async function PatientPage({
       </div>
 
       {/* Recent notes */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Recent Notes</h2>
+      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+        <h2 className="text-sm font-bold text-slate-900 mb-3">Recent Notes</h2>
         {patient.clinicalNotes.length === 0 ? (
           <div className="text-sm text-slate-400">No notes yet</div>
         ) : (
@@ -266,8 +266,8 @@ export default async function PatientPage({
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex justify-between text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className={mono ? "font-mono text-xs" : ""}>{value}</span>
+      <span className="text-slate-600 font-medium">{label}</span>
+      <span className={mono ? "font-mono text-xs text-slate-900" : "text-slate-900 font-semibold"}>{value}</span>
     </div>
   );
 }

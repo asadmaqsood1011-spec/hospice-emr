@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
+import { queueNote } from "@/lib/outbox";
 
 type SoapDraft = {
   subjective: string;
@@ -78,11 +79,24 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   async function save(sign: boolean) {
     if (!draft) return;
     setBusy("saving");
+
+    const payload = { patientId, transcript, ...draft, sign };
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      await queueNote({ ...payload, sign });
+      window.dispatchEvent(new Event("outbox-changed"));
+      toast.success("Offline — note queued, will sync when online");
+      setDraft(null);
+      setTranscript("");
+      setBusy("idle");
+      return;
+    }
+
     try {
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId, transcript, ...draft, sign }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Save failed");
       toast.success(sign ? "Note signed" : "Note saved as draft");
@@ -90,7 +104,12 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       setTranscript("");
       window.location.reload();
     } catch (e) {
-      toast.error((e as Error).message);
+      // Network failed mid-request — queue it
+      await queueNote({ ...payload, sign });
+      window.dispatchEvent(new Event("outbox-changed"));
+      toast.warning(`Save failed (${(e as Error).message}) — queued for sync`);
+      setDraft(null);
+      setTranscript("");
     } finally {
       setBusy("idle");
     }

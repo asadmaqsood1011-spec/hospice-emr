@@ -27,6 +27,12 @@ export default async function TwoFaPage() {
     <div className="max-w-2xl">
       <h1 className="text-3xl font-bold text-slate-900 mb-6">Two-Factor Authentication</h1>
 
+      {session.user.totpRequired && !session.user.totpVerified && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          Clinical accounts must enable 2FA before opening patient charts. After enabling, sign out and sign in with your code.
+        </div>
+      )}
+
       {user.totpEnabled ? (
         <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
           <div className="flex items-center gap-2">

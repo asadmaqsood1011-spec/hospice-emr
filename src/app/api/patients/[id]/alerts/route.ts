@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
+import { requirePatientAccess } from "@/lib/patient-access";
 
 const Body = z.object({
   kind: z.enum(["pain-crisis", "death", "urgent-followup"]),
@@ -17,12 +18,15 @@ export async function POST(
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  const access = await requirePatientAccess(session, id, "patient.update");
+  if (!access.ok) return access.response;
+
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Bad request" }, { status: 400 });
 
   const patient = await prisma.patient.findUnique({
     where: { id },
-    select: { firstName: true, lastName: true, mrn: true },
+    select: { mrn: true },
   });
   if (!patient) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -31,7 +35,8 @@ export async function POST(
     select: { oncallPhone: true },
   });
 
-  const body = `[Hospice EMR] ${parsed.data.kind}: ${patient.firstName} ${patient.lastName} (${patient.mrn}). ${parsed.data.message}`;
+  const mrnSuffix = patient.mrn.slice(-4).padStart(patient.mrn.length, "*");
+  const body = `[Hospice EMR] ${parsed.data.kind}: MRN ${mrnSuffix}. ${parsed.data.message}`;
   const sent = await sendTwilio(recipients.map((r) => r.oncallPhone).filter(Boolean) as string[], body);
 
   await audit({
@@ -40,7 +45,7 @@ export async function POST(
     action: "CREATE",
     resource: "SmsAlert",
     resourceId: id,
-    metadata: { kind: parsed.data.kind, sent, recipients: recipients.length },
+    metadata: { kind: parsed.data.kind, sent, recipients: recipients.length, ...(access.viaBreakGlass ? { viaBreakGlass: true } : {}) },
   });
 
   return NextResponse.json({ sent, recipients: recipients.length });

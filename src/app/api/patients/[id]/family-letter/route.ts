@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { getOpenAI } from "@/lib/openai";
 import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { requirePatientAccess } from "@/lib/patient-access";
 
 const RATE_MAX = 10;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -25,6 +26,9 @@ export async function GET(
   }
 
   const { id } = await params;
+  const access = await requirePatientAccess(session, id, "patient.read");
+  if (!access.ok) return access.response;
+
   const patient = await prisma.patient.findUnique({
     where: { id },
     include: {
@@ -72,7 +76,7 @@ export async function GET(
       action: "READ",
       resource: "FamilyLetter",
       resourceId: id,
-      metadata: { aiModel: "gpt-4o" },
+      metadata: { aiModel: "gpt-4o", ...(access.viaBreakGlass ? { viaBreakGlass: true } : {}) },
     });
 
     return NextResponse.json({ letter }, { headers: rateLimitHeaders(rl, RATE_MAX) });

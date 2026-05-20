@@ -1,6 +1,6 @@
 import type { Role } from "@/generated/prisma";
 
-type Permission =
+export type Permission =
   | "patient.read"
   | "patient.create"
   | "patient.update"

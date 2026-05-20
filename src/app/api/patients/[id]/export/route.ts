@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { buildChartPdf } from "@/lib/pdf";
+import { requirePatientAccess } from "@/lib/patient-access";
 
 export async function GET(
   req: Request,
@@ -12,6 +13,9 @@ export async function GET(
   if (!session?.user) return new NextResponse("Unauthorized", { status: 401 });
 
   const { id } = await params;
+  const access = await requirePatientAccess(session, id, "patient.read");
+  if (!access.ok) return access.response;
+
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "json";
 
@@ -44,7 +48,7 @@ export async function GET(
     action: "EXPORT",
     resource: "Patient",
     resourceId: patient.id,
-    metadata: { format },
+    metadata: { format, ...(access.viaBreakGlass ? { viaBreakGlass: true } : {}) },
   });
 
   if (format === "pdf") {

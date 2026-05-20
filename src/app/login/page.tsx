@@ -78,7 +78,7 @@ export default async function LoginPage({
 
           <div>
             <label htmlFor="totp" className="block text-sm font-semibold text-slate-800 mb-1.5">
-              2FA Code <span className="font-normal text-slate-500">(if enabled)</span>
+              2FA Code <span className="font-normal text-slate-500">(required after setup)</span>
             </label>
             <input
               id="totp"

@@ -4,6 +4,12 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/totp";
+import {
+  checkLoginAllowed,
+  clearLoginFailures,
+  clinicalRoleNeedsTotp,
+  recordLoginFailure,
+} from "@/lib/login-guard";
 import type { Role } from "@/generated/prisma";
 
 const CredsSchema = z.object({
@@ -35,19 +41,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = CredsSchema.safeParse(creds);
         if (!parsed.success) return null;
 
+        const email = parsed.data.email.toLowerCase();
+        const allowed = checkLoginAllowed(email);
+        if (!allowed.ok) return null;
+
         const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
+          where: { email },
         });
-        if (!user || !user.active) return null;
+        if (!user || !user.active) {
+          recordLoginFailure(email);
+          return null;
+        }
 
         const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
-        if (!ok) return null;
+        if (!ok) {
+          recordLoginFailure(email);
+          return null;
+        }
 
+        let totpVerified = false;
         if (user.totpEnabled) {
           const code = (parsed.data.totp ?? "").trim();
-          if (!code || !user.totpSecret) return null;
-          if (!verifyToken(code, user.totpSecret)) return null;
+          if (!code || !user.totpSecret) {
+            recordLoginFailure(email);
+            return null;
+          }
+          if (!verifyToken(code, user.totpSecret)) {
+            recordLoginFailure(email);
+            return null;
+          }
+          totpVerified = true;
         }
+
+        clearLoginFailures(email);
 
         await prisma.user.update({
           where: { id: user.id },
@@ -59,6 +85,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          totpRequired: clinicalRoleNeedsTotp(user.role),
+          totpVerified,
         };
       },
     }),
@@ -68,6 +96,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role: Role }).role;
+        token.totpRequired = (user as { totpRequired?: boolean }).totpRequired ?? false;
+        token.totpVerified = (user as { totpVerified?: boolean }).totpVerified ?? false;
       }
       return token;
     },
@@ -75,15 +105,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         (session.user as { role?: Role }).role = token.role as Role;
+        session.user.totpRequired = Boolean(token.totpRequired);
+        session.user.totpVerified = Boolean(token.totpVerified);
       }
       return session;
     },
     authorized: ({ auth, request }) => {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
-      const isPublic = pathname.startsWith("/login") || pathname === "/";
+      const isPublic = pathname.startsWith("/login") || pathname === "/" || pathname === "/api/health";
       if (isPublic) return true;
-      return isLoggedIn;
+      if (!isLoggedIn) return false;
+
+      const needsTotp = auth.user.totpRequired && !auth.user.totpVerified;
+      if (needsTotp && !pathname.startsWith("/settings/2fa")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/settings/2fa";
+        url.searchParams.set("required", "1");
+        return Response.redirect(url);
+      }
+
+      return true;
     },
   },
 });
@@ -95,6 +137,8 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       role: Role;
+      totpRequired?: boolean;
+      totpVerified?: boolean;
     };
   }
 }

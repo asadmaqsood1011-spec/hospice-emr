@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/audit";
+import { fhirGate } from "@/lib/fhir";
+import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = fhirGate(req);
+  if (blocked) return blocked;
+
+  const clientId = (req.headers.get("authorization") ?? "anon").slice(-12);
+  const rl = rateLimit(`fhir:${clientId}:list`, 60, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { resourceType: "OperationOutcome", issue: [{ severity: "error", code: "throttled" }] },
+      { status: 429, headers: rateLimitHeaders(rl, 60) }
+    );
+  }
 
   const url = new URL(req.url);
   const name = url.searchParams.get("name") ?? undefined;
@@ -26,6 +37,12 @@ export async function GET(req: Request) {
     take: 25,
   });
 
+  await audit({
+    action: "READ",
+    resource: "FhirPatient",
+    metadata: { fhirClient: clientId, query: { name: Boolean(name), identifier: Boolean(identifier) }, count: patients.length },
+  });
+
   return NextResponse.json({
     resourceType: "Bundle",
     type: "searchset",
@@ -34,7 +51,7 @@ export async function GET(req: Request) {
       fullUrl: `/api/fhir/Patient/${patient.id}`,
       resource: toFhirPatient(patient),
     })),
-  });
+  }, { headers: rateLimitHeaders(rl, 60) });
 }
 
 function toFhirPatient(patient: {

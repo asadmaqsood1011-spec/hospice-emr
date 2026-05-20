@@ -299,9 +299,9 @@ export default async function PatientPage({
           {patient.photos.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {patient.photos.map((photo) => (
-                <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="block">
+                <a key={photo.id} href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt={photo.caption ?? photo.filename} className="aspect-square w-full object-cover rounded-lg border border-stone-200" />
+                  <img src={`/api/photos/${photo.id}`} alt={photo.caption ?? photo.filename} className="aspect-square w-full object-cover rounded-lg border border-stone-200" />
                   <div className="mt-1 text-xs text-slate-600 truncate">{photo.caption ?? photo.filename}</div>
                 </a>
               ))}

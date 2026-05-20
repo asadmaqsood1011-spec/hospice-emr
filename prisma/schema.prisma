@@ -1,4 +1,4 @@
-// Hospice EMR — PHIPA-aware schema
+// Hospice EMR — HIPAA-ready schema
 // Single-clinic deployment, voice-first SOAP workflow.
 
 generator client {

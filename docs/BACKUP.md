@@ -20,7 +20,7 @@ Output: `./backups/hospice-emr-YYYYMMDDTHHMMSSZ.sql.enc`
 
 - Daily at 02:00 ET
 - 30-day retention
-- Stored in: AWS S3 bucket `s3://hospice-emr-backups/` w/ object lock + cross-region replication to ca-central-1
+- Stored in: HIPAA-eligible object storage with object lock, encryption, access logging, and vendor BAA
 - Notification: PagerDuty if no upload in 26h
 
 ## Restore (manual drill)
@@ -47,5 +47,5 @@ Script asks you to type the DB host to confirm before destructive ops.
 If a backup is suspected compromised:
 1. Rotate `BACKUP_PASSPHRASE` immediately
 2. Re-encrypt all retained backups with new passphrase
-3. File breach notification per PHIPA s.12 (Information & Privacy Commissioner of Ontario)
-4. Notify affected patients per s.12(2)
+3. Follow HIPAA breach notification workflow with counsel/privacy officer
+4. Notify affected individuals and regulators when required

@@ -1,6 +1,6 @@
 # Audit Retention Policy
 
-Default retention is **7 years** (`AUDIT_RETENTION_DAYS=2555`) for PHIPA-aware operational audit logs.
+Default retention is **7 years** (`AUDIT_RETENTION_DAYS=2555`) for HIPAA-ready operational audit logs.
 
 Audit rows are append-only during app use. Retention archive is export-only. It does not prune or mutate production audit rows.
 

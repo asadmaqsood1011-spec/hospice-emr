@@ -1,24 +1,24 @@
 # Hospice EMR
 
-> Voice-first electronic medical record for hospice care. PHIPA-aware architecture. Nurse dictates → AI structures into SOAP notes → reviewed and signed in seconds.
+> Voice-first electronic medical record for hospice care. HIPAA-ready architecture for US hospice workflows. Nurse dictates -> AI structures into SOAP notes -> reviewed and signed in seconds.
 
-**Status:** MVP scaffold. Not certified, not for production patient data without a Privacy Impact Assessment.
+**Status:** MVP scaffold. Not HIPAA-compliant, not for production patient data until BAAs, policies, risk analysis, and operational controls are complete.
 
 ## Why This Exists
 
-Hospices in Ontario run on paper, fax, and 2005-era EMRs. Epic and Cerner are built for acute care and cost millions. This is a small, single-clinic EMR designed around the hospice nurse home visit workflow: dictate at the bedside, AI handles the typing.
+US hospice teams still run too much of the bedside-to-back-office workflow on paper, fax, and 2005-era EMRs. Epic and Cerner are built for acute care and cost millions. This is a small, single-clinic EMR designed around the hospice nurse home visit workflow: dictate at the bedside, AI handles the typing.
 
 **Differentiators:**
 - Voice-first: Whisper transcribes, GPT-4o structures into SOAP + extracts ESAS/PPS/meds
 - Hospice-specific data model: PPS, ESAS-r, level of care, code status, prognosis attestation
-- Immutable audit log on every PHI access (PHIPA-aware)
+- Immutable audit log on every PHI access
 - Single-clinic deployment, multi-role RBAC (Admin/MD/RN/SW/Chaplain/Aide/Volunteer)
 
 ## Stack
 
 - **Next.js 16** (App Router, Server Actions, Server Components)
 - **TypeScript** + **Tailwind CSS 4**
-- **Postgres** via **Prisma 6** (recommended host: Neon, ca-central-1 for data residency)
+- **Postgres** via **Prisma 6** (US-hosted database; vendor BAA required before real PHI)
 - **NextAuth 5** (credentials provider, JWT, 15-min idle timeout)
 - **OpenAI** (Whisper + GPT-4o, JSON mode)
 - **Recharts** for ESAS/PPS trends
@@ -30,10 +30,10 @@ Hospices in Ontario run on paper, fax, and 2005-era EMRs. Epic and Cerner are bu
 # 1. Install deps
 npm install
 
-# 2. Configure DB (Neon, ca-central-1)
+# 2. Configure DB
 #    Sign up at https://neon.tech → create project
 #    Paste connection string into .env -> DATABASE_URL
-#    Region: AWS Canada Central for PHIPA data residency
+#    Use US region for US hospice; vendor BAA required before real PHI
 
 # 3. Push schema + seed
 npx prisma db push
@@ -63,13 +63,14 @@ All passwords: `hospice123!`
 4. Editable SOAP draft appears with extracted ESAS scores, PPS, med changes, ICD-10 codes
 5. Nurse reviews and **Signs & Saves** → ESAS/PPS rows persisted, audit log updated
 
-## PHIPA-Aware Design
+## HIPAA-Ready Design
 
-This is **PHIPA-aware**, not PHIPA-compliant. Compliance is a legal status requiring a Privacy Impact Assessment, Threat Risk Assessment, designated Privacy Officer, signed agreements, and ongoing controls. The architecture below is built for those reviews to go smoothly:
+This is **HIPAA-ready**, not HIPAA-compliant. Compliance requires BAAs with vendors, HIPAA security risk analysis, written policies, workforce access controls, breach response process, and ongoing operational controls. The architecture below is built for those reviews to go smoothly:
 
 - TLS everywhere (Vercel/Neon defaults)
 - Encryption at rest (Neon Postgres default)
-- Canadian data residency (Neon ca-central-1)
+- US-hosted data path for US hospice workflows
+- BAAs required for hosting, database, object storage, and AI vendors before real PHI
 - Immutable append-only audit log on every PHI read/write
 - Per-user RBAC (`src/lib/rbac.ts`)
 - 15-min idle session timeout

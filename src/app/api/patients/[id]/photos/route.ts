@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { sniffImage } from "@/lib/file-magic";
 import { logger } from "@/lib/logger";
 import { requirePatientAccess } from "@/lib/patient-access";
+import { publicBlobPhotosEnabled } from "@/lib/photo-storage";
 
 const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
 
@@ -19,6 +20,13 @@ export async function POST(
   const { id } = await params;
   const access = await requirePatientAccess(session, id, "patient.update");
   if (!access.ok) return access.response;
+
+  if (!publicBlobPhotosEnabled()) {
+    return NextResponse.json(
+      { error: "Photo upload disabled until private PHI-safe storage is configured" },
+      { status: 503 }
+    );
+  }
 
   const form = await req.formData();
   const file = form.get("photo");
@@ -35,7 +43,7 @@ export async function POST(
     return NextResponse.json({ error: "Not a recognized image format" }, { status: 415 });
   }
 
-  // Upload to Vercel Blob. Requires BLOB_READ_WRITE_TOKEN env.
+  // Public Vercel Blob is only allowed by explicit non-PHI/dev opt-in.
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     logger.error({ route: "photos" }, "BLOB_READ_WRITE_TOKEN missing");
     return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
@@ -48,7 +56,7 @@ export async function POST(
     blob = await put(path, buf, {
       access: "public",
       contentType: sniffed.mime,
-      // Vercel Blob is public-read here, so app UI serves it through /api/photos/:id.
+      // Public-read blobs are disabled by default for real PHI.
       addRandomSuffix: false,
       cacheControlMaxAge: 0,
     });

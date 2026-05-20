@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { requirePatientAccess } from "@/lib/patient-access";
+import { publicBlobPhotosEnabled } from "@/lib/photo-storage";
 
 export async function GET(
   _req: Request,
@@ -11,6 +12,13 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!publicBlobPhotosEnabled()) {
+    return NextResponse.json(
+      { error: "Photos disabled until private PHI-safe storage is configured" },
+      { status: 503 }
+    );
+  }
 
   const { id } = await params;
   const photo = await prisma.photo.findUnique({

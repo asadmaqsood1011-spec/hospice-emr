@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { get } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { requirePatientAccess } from "@/lib/patient-access";
-import { publicBlobPhotosEnabled } from "@/lib/photo-storage";
 
 export async function GET(
   _req: Request,
@@ -12,13 +12,6 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!publicBlobPhotosEnabled()) {
-    return NextResponse.json(
-      { error: "Photos disabled until private PHI-safe storage is configured" },
-      { status: 503 }
-    );
-  }
 
   const { id } = await params;
   const photo = await prisma.photo.findUnique({
@@ -33,12 +26,12 @@ export async function GET(
   const access = await requirePatientAccess(session, photo.patientId, "patient.read");
   if (!access.ok) return access.response;
 
-  const upstream = await fetch(photo.url, { cache: "no-store" }).catch((err: Error) => {
+  const privateBlob = await get(photo.url, { access: "private", useCache: false }).catch((err: Error) => {
     logger.error({ route: "photos.get", err: err.message }, "Blob fetch failed");
     return null;
   });
 
-  if (!upstream?.ok || !upstream.body) {
+  if (!privateBlob?.stream) {
     return NextResponse.json({ error: "Photo unavailable" }, { status: 502 });
   }
 
@@ -51,7 +44,7 @@ export async function GET(
     metadata: access.viaBreakGlass ? { viaBreakGlass: true } : undefined,
   });
 
-  return new NextResponse(upstream.body, {
+  return new NextResponse(privateBlob.stream, {
     headers: {
       "Content-Type": photo.mimeType,
       "Cache-Control": "private, no-store",

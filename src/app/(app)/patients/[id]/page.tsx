@@ -34,7 +34,6 @@ import { RecentPatientTracker } from "@/components/recent-patients";
 import { SummaryCard } from "@/components/summary-card";
 import { VisitTimer } from "@/components/visit-timer";
 import { EmptyState } from "@/components/ui/empty-state";
-import { publicBlobPhotosEnabled } from "@/lib/photo-storage";
 
 export default async function PatientPage({
   params,
@@ -95,7 +94,6 @@ export default async function PatientPage({
   const latestEsas = patient.esasScores.at(-1);
   const latestPps = patient.ppsScores.at(-1);
   const patientName = fullName(patient);
-  const photosEnabled = publicBlobPhotosEnabled();
 
   return (
     <div className="space-y-5">
@@ -270,10 +268,8 @@ export default async function PatientPage({
             </div>
             <div className="panel space-y-4 p-5">
               <SectionTitle icon={<Camera className="h-4 w-4" />} title="Photos" />
-              {photosEnabled ? <PhotoUpload patientId={patient.id} /> : null}
-              {!photosEnabled ? (
-                <EmptyState icon={Camera} title="Photos disabled" hint="Private PHI-safe storage is required before patient photos are enabled." />
-              ) : patient.photos.length > 0 ? (
+              <PhotoUpload patientId={patient.id} />
+              {patient.photos.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {patient.photos.map((photo) => (
                     <a key={photo.id} href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">

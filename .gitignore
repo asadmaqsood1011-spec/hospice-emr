@@ -52,3 +52,5 @@ hospice-dev.err.log
 # local artifacts
 audit-archives/
 backups/
+
+.env*.local

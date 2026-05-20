@@ -73,6 +73,23 @@ enum ReferralStatus {
   DECLINED
 }
 
+enum PlanOfCareStatus {
+  DRAFT
+  ACTIVE
+  SIGNED
+  SUPERSEDED
+}
+
+enum IdgStatus {
+  DRAFT
+  SIGNED
+}
+
+enum MedicationReconciliationStatus {
+  OPEN
+  COMPLETED
+}
+
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
@@ -132,6 +149,9 @@ model Patient {
   photos        Photo[]
   faxes         Fax[]
   sourceReferrals Referral[] @relation("ConvertedReferral")
+  plansOfCare     PlanOfCare[]
+  idgItems        IdgReviewItem[]
+  medReconciliations MedicationReconciliation[]
 }
 
 model Referral {
@@ -199,6 +219,95 @@ model Medication {
   prescriberId   String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  reconciliationItems MedicationReconciliationItem[]
+}
+
+model PlanOfCare {
+  id                  String           @id @default(cuid())
+  patientId           String
+  patient             Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status              PlanOfCareStatus @default(DRAFT)
+  certificationStart  DateTime
+  certificationEnd    DateTime
+  primaryDiagnosis    String
+  goals               String
+  interventions       String
+  disciplines         String
+  visitFrequency      String
+  physicianName       String?
+  signedById          String?
+  signedAt            DateTime?
+  createdById         String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([patientId, status])
+  @@index([certificationEnd])
+}
+
+model IdgMeeting {
+  id        String          @id @default(cuid())
+  title     String
+  meetingAt DateTime        @default(now())
+  status    IdgStatus       @default(DRAFT)
+  attendees String?
+  createdById String?
+  signedById  String?
+  signedAt    DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     IdgReviewItem[]
+
+  @@index([meetingAt])
+  @@index([status])
+}
+
+model IdgReviewItem {
+  id        String     @id @default(cuid())
+  meetingId String
+  meeting   IdgMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  patientId String
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  disciplineUpdates String
+  decisions String
+  actionItems String?
+  createdAt DateTime   @default(now())
+
+  @@index([patientId, createdAt])
+  @@index([meetingId])
+}
+
+model MedicationReconciliation {
+  id          String                         @id @default(cuid())
+  patientId   String
+  patient     Patient                        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status      MedicationReconciliationStatus @default(COMPLETED)
+  reason      String
+  source      String?
+  notes       String?
+  performedById String?
+  completedAt DateTime?
+  createdAt   DateTime                       @default(now())
+  items       MedicationReconciliationItem[]
+
+  @@index([patientId, completedAt])
+  @@index([status])
+}
+
+model MedicationReconciliationItem {
+  id              String   @id @default(cuid())
+  reconciliationId String
+  reconciliation   MedicationReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  medicationId    String?
+  medication      Medication? @relation(fields: [medicationId], references: [id])
+  medicationName  String
+  action          String
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@index([reconciliationId])
+  @@index([medicationId])
 }
 
 model Visit {

@@ -26,6 +26,7 @@ import { ESASChart } from "@/components/esas-chart";
 import { PPSChart } from "@/components/pps-chart";
 import { VoiceNoteRecorder } from "@/components/voice-note-recorder";
 import { FamilyLetter } from "@/components/family-letter";
+import { IncumbentWorkflows } from "@/components/incumbent-workflows";
 import { InteractionsPanel } from "@/components/interactions-panel";
 import { PatientActions } from "@/components/patient-actions";
 import { PatientClinicalForms } from "@/components/patient-clinical-forms";
@@ -72,6 +73,9 @@ export default async function PatientPage({
       contacts: { orderBy: { isPrimary: "desc" } },
       esasScores: { orderBy: { recordedAt: "asc" }, take: 30 },
       ppsScores: { orderBy: { recordedAt: "asc" }, take: 30 },
+      plansOfCare: { orderBy: { createdAt: "desc" }, take: 3 },
+      idgItems: { orderBy: { createdAt: "desc" }, take: 3, include: { meeting: true } },
+      medReconciliations: { orderBy: { createdAt: "desc" }, take: 3, include: { items: true } },
       clinicalNotes: {
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -200,6 +204,15 @@ export default async function PatientPage({
           </section>
 
           <PatientClinicalForms patientId={patient.id} canAddMedication={can(session?.user.role, "med.prescribe")} />
+
+          <IncumbentWorkflows
+            patientId={patient.id}
+            patientDx={patient.primaryDx}
+            meds={patient.meds}
+            plans={patient.plansOfCare}
+            idgItems={patient.idgItems}
+            medRecs={patient.medReconciliations}
+          />
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="panel p-5 xl:col-span-2">

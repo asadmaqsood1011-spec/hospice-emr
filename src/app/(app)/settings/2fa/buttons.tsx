@@ -45,14 +45,13 @@ export function Enable2FA() {
 }
 
 export function Disable2FA() {
+  const [code, setCode] = useState("");
   const [pending, start] = useTransition();
   return (
-    <button
-      type="button"
-      onClick={() =>
+    <form
+      action={(fd) =>
         start(async () => {
-          if (!confirm("Disable 2FA? You'll only need your password to log in.")) return;
-          const res = await disable2fa();
+          const res = await disable2fa(fd);
           if (res?.error) toast.error(res.error);
           else {
             toast.success("2FA disabled");
@@ -60,10 +59,26 @@ export function Disable2FA() {
           }
         })
       }
-      disabled={pending}
-      className="px-4 py-2 text-sm font-semibold rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+      className="flex flex-wrap items-center gap-2"
     >
-      {pending ? "Disabling..." : "Disable 2FA"}
-    </button>
+      <input
+        name="code"
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        placeholder="Current code"
+        inputMode="numeric"
+        pattern="[0-9]{6}"
+        maxLength={6}
+        required
+        className="px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg w-36 bg-white text-slate-900"
+      />
+      <button
+        type="submit"
+        disabled={pending || code.length !== 6}
+        className="px-4 py-2 text-sm font-semibold rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+      >
+        {pending ? "Disabling..." : "Disable 2FA"}
+      </button>
+    </form>
   );
 }

@@ -1,60 +1,58 @@
-type LoginBucket = {
-  failures: number;
-  windowResetAt: number;
-  lockedUntil: number;
-};
+import crypto from "node:crypto";
+import { prisma } from "@/lib/prisma";
 
 const MAX_FAILURES = 5;
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 
-const buckets = new Map<string, LoginBucket>();
-
 function keyFor(email: string) {
-  return email.trim().toLowerCase();
+  return crypto.createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 }
 
-export function checkLoginAllowed(email: string) {
+export async function checkLoginAllowed(email: string) {
   const now = Date.now();
-  const key = keyFor(email);
-  const bucket = buckets.get(key);
+  const since = new Date(now - WINDOW_MS);
+  const failures = await prisma.auditLog.count({
+    where: {
+      action: "LOGIN",
+      resource: "LoginFailure",
+      resourceId: keyFor(email),
+      ts: { gte: since },
+    },
+  });
 
-  if (!bucket) return { ok: true, retryAfterSeconds: 0 };
-  if (bucket.lockedUntil > now) {
+  if (failures >= MAX_FAILURES) {
     return {
       ok: false,
-      retryAfterSeconds: Math.ceil((bucket.lockedUntil - now) / 1000),
+      retryAfterSeconds: Math.ceil(LOCK_MS / 1000),
     };
   }
-  if (bucket.windowResetAt <= now) buckets.delete(key);
 
   return { ok: true, retryAfterSeconds: 0 };
 }
 
-export function recordLoginFailure(email: string) {
-  const now = Date.now();
-  const key = keyFor(email);
-  const existing = buckets.get(key);
-  const bucket =
-    !existing || existing.windowResetAt <= now
-      ? { failures: 0, windowResetAt: now + WINDOW_MS, lockedUntil: 0 }
-      : existing;
-
-  bucket.failures += 1;
-  if (bucket.failures >= MAX_FAILURES) {
-    bucket.lockedUntil = now + LOCK_MS;
-  }
-  buckets.set(key, bucket);
-
-  return {
-    locked: bucket.lockedUntil > now,
-    retryAfterSeconds:
-      bucket.lockedUntil > now ? Math.ceil((bucket.lockedUntil - now) / 1000) : 0,
-  };
+export async function recordLoginFailure(email: string, reason: string) {
+  await prisma.auditLog.create({
+    data: {
+      action: "LOGIN",
+      resource: "LoginFailure",
+      resourceId: keyFor(email),
+      reason,
+      metadata: { windowMs: WINDOW_MS, maxFailures: MAX_FAILURES },
+    },
+  });
 }
 
-export function clearLoginFailures(email: string) {
-  buckets.delete(keyFor(email));
+export async function recordLoginSuccess(userId: string) {
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: "LOGIN",
+      resource: "User",
+      resourceId: userId,
+      metadata: { event: "login-success" },
+    },
+  });
 }
 
 export function clinicalRoleNeedsTotp(role: string | undefined | null) {

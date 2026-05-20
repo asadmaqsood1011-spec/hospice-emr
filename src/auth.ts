@@ -6,9 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/totp";
 import {
   checkLoginAllowed,
-  clearLoginFailures,
   clinicalRoleNeedsTotp,
   recordLoginFailure,
+  recordLoginSuccess,
 } from "@/lib/login-guard";
 import type { Role } from "@/generated/prisma";
 
@@ -42,20 +42,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const email = parsed.data.email.toLowerCase();
-        const allowed = checkLoginAllowed(email);
+        const allowed = await checkLoginAllowed(email);
         if (!allowed.ok) return null;
 
         const user = await prisma.user.findUnique({
           where: { email },
         });
         if (!user || !user.active) {
-          recordLoginFailure(email);
+          await recordLoginFailure(email, "unknown-or-inactive-user");
           return null;
         }
 
         const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!ok) {
-          recordLoginFailure(email);
+          await recordLoginFailure(email, "bad-password");
           return null;
         }
 
@@ -63,22 +63,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (user.totpEnabled) {
           const code = (parsed.data.totp ?? "").trim();
           if (!code || !user.totpSecret) {
-            recordLoginFailure(email);
+            await recordLoginFailure(email, "missing-totp");
             return null;
           }
           if (!verifyToken(code, user.totpSecret)) {
-            recordLoginFailure(email);
+            await recordLoginFailure(email, "bad-totp");
             return null;
           }
           totpVerified = true;
         }
 
-        clearLoginFailures(email);
-
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
         });
+        await recordLoginSuccess(user.id);
 
         return {
           id: user.id,

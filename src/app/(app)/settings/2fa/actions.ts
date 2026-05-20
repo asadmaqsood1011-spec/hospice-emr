@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/totp";
 import { audit } from "@/lib/audit";
+import { clinicalRoleNeedsTotp } from "@/lib/login-guard";
 
 export async function enable2fa(formData: FormData) {
   const session = await auth();
@@ -33,9 +34,19 @@ export async function enable2fa(formData: FormData) {
   return { ok: true };
 }
 
-export async function disable2fa() {
+export async function disable2fa(formData: FormData) {
   const session = await auth();
   if (!session?.user) return { error: "Unauthorized" };
+
+  const code = String(formData.get("code") ?? "").trim();
+  if (!/^\d{6}$/.test(code)) return { error: "Current 2FA code required" };
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user?.totpEnabled || !user.totpSecret) return { error: "2FA is not enabled" };
+  if (clinicalRoleNeedsTotp(user.role)) {
+    return { error: "Clinical accounts cannot self-disable 2FA. Ask an admin." };
+  }
+  if (!verifyToken(code, user.totpSecret)) return { error: "Invalid 2FA code" };
 
   await prisma.user.update({
     where: { id: session.user.id },

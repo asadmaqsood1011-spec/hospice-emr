@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { queueNote } from "@/lib/outbox";
 
@@ -20,15 +21,11 @@ const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "pa", label: "Punjabi" },
   { code: "tl", label: "Tagalog" },
-  { code: "fr", label: "Français" },
-  { code: "es", label: "Español" },
-  { code: "zh", label: "中文" },
-  { code: "hi", label: "हिन्दी" },
-  { code: "ar", label: "العربية" },
-  { code: "ur", label: "اردو" },
+  { code: "fr", label: "French" },
 ];
 
 export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
+  const router = useRouter();
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<"idle" | "transcribing" | "structuring" | "saving">("idle");
   const [transcript, setTranscript] = useState("");
@@ -37,20 +34,53 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   const [visitType, setVisitType] = useState("RN_VISIT");
   const [draft, setDraft] = useState<SoapDraft | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef(0);
+
+  const supportedMime = useMemo(() => {
+    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return "";
+    if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
+    if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
+    return "";
+  }, []);
+
+  const canRecord =
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.mediaDevices?.getUserMedia) &&
+    typeof MediaRecorder !== "undefined" &&
+    Boolean(supportedMime);
+
+  useEffect(() => {
+    if (!recording && busy === "idle" && !draft) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [recording, busy, draft]);
 
   async function start() {
+    if (!canRecord) {
+      toast.error("Recording is not supported in this browser");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      streamRef.current = stream;
+      const mr = new MediaRecorder(stream, { mimeType: supportedMime });
       chunksRef.current = [];
       mr.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: supportedMime });
         process(blob);
       };
-      mr.start();
+      startedAtRef.current = Date.now();
+      mr.start(1000);
       mediaRecorderRef.current = mr;
       setRecording(true);
     } catch (e) {
@@ -60,15 +90,25 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   }
 
   function stop() {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     setRecording(false);
   }
 
   async function process(blob: Blob) {
+    const durationMs = Date.now() - startedAtRef.current;
+    if (durationMs < 1500 || blob.size < 1024) {
+      toast.error("Recording too short");
+      setBusy("idle");
+      return;
+    }
+
     setBusy("transcribing");
     try {
       const fd = new FormData();
-      fd.append("audio", blob, "note.webm");
+      fd.append("audio", blob, supportedMime === "audio/mp4" ? "note.mp4" : "note.webm");
       fd.append("language", language);
       const tRes = await fetch("/api/transcribe", { method: "POST", body: fd });
       if (!tRes.ok) throw new Error("Transcription failed");
@@ -85,7 +125,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       if (!sRes.ok) throw new Error("SOAP structuring failed");
       const soap = await sRes.json();
       setDraft(soap);
-      toast.success("SOAP draft ready — review and sign");
+      toast.success("SOAP draft ready - review and sign");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -111,7 +151,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       await queueNote({ ...payload, sign });
       window.dispatchEvent(new Event("outbox-changed"));
-      toast.success("Offline — note queued, will sync when online");
+      toast.success("Offline - note queued, will sync when online");
       clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
@@ -130,12 +170,11 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
-      window.location.reload();
+      router.refresh();
     } catch (e) {
-      // Network failed mid-request — queue it
       await queueNote({ ...payload, sign });
       window.dispatchEvent(new Event("outbox-changed"));
-      toast.warning(`Save failed (${(e as Error).message}) — queued for sync`);
+      toast.warning(`Save failed (${(e as Error).message}) - queued for sync`);
       clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
@@ -147,6 +186,11 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
+        {!canRecord && (
+          <div className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+            Voice recording unavailable in this browser. Use Chrome, Edge, or Safari 17+.
+          </div>
+        )}
         <select
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
@@ -180,7 +224,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
           <button
             type="button"
             onClick={start}
-            disabled={busy !== "idle"}
+            disabled={busy !== "idle" || !canRecord}
             className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
           >
             <span className="w-2 h-2 rounded-full bg-white" />
@@ -216,9 +260,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
               <div className="text-xs text-slate-500 mb-1">
                 Original ({LANGUAGES.find((l) => l.code === language)?.label})
               </div>
-              <div className="text-slate-700" dir={["ar", "ur"].includes(language) ? "rtl" : "ltr"}>
-                {transcriptOriginal}
-              </div>
+              <div className="text-slate-700">{transcriptOriginal}</div>
             </div>
           )}
         </div>
@@ -226,26 +268,10 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
 
       {draft && (
         <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-          <SoapField
-            label="Subjective"
-            value={draft.subjective}
-            onChange={(v) => setDraft({ ...draft, subjective: v })}
-          />
-          <SoapField
-            label="Objective"
-            value={draft.objective}
-            onChange={(v) => setDraft({ ...draft, objective: v })}
-          />
-          <SoapField
-            label="Assessment"
-            value={draft.assessment}
-            onChange={(v) => setDraft({ ...draft, assessment: v })}
-          />
-          <SoapField
-            label="Plan"
-            value={draft.plan}
-            onChange={(v) => setDraft({ ...draft, plan: v })}
-          />
+          <SoapField label="Subjective" value={draft.subjective} onChange={(v) => setDraft({ ...draft, subjective: v })} />
+          <SoapField label="Objective" value={draft.objective} onChange={(v) => setDraft({ ...draft, objective: v })} />
+          <SoapField label="Assessment" value={draft.assessment} onChange={(v) => setDraft({ ...draft, assessment: v })} />
+          <SoapField label="Plan" value={draft.plan} onChange={(v) => setDraft({ ...draft, plan: v })} />
 
           {(draft.esas || draft.pps !== undefined || draft.medChanges?.length) && (
             <div className="p-3 bg-slate-50 text-xs space-y-1">
@@ -253,12 +279,8 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
               {draft.pps !== undefined && draft.pps !== null && (
                 <div>PPS: <span className="font-mono">{draft.pps}</span></div>
               )}
-              {draft.esas && (
-                <div>ESAS: <span className="font-mono">{JSON.stringify(draft.esas)}</span></div>
-              )}
-              {draft.medChanges && draft.medChanges.length > 0 && (
-                <div>Med changes: {draft.medChanges.join("; ")}</div>
-              )}
+              {draft.esas && <div>ESAS: <span className="font-mono">{JSON.stringify(draft.esas)}</span></div>}
+              {draft.medChanges && draft.medChanges.length > 0 && <div>Med changes: {draft.medChanges.join("; ")}</div>}
               {draft.icd10 && draft.icd10.length > 0 && (
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">ICD-10 codes</label>
@@ -277,9 +299,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
                   />
                 </div>
               )}
-              {draft.confidence !== undefined && (
-                <div>Confidence: {Math.round((draft.confidence ?? 0) * 100)}%</div>
-              )}
+              {draft.confidence !== undefined && <div>Confidence: {Math.round((draft.confidence ?? 0) * 100)}%</div>}
             </div>
           )}
 

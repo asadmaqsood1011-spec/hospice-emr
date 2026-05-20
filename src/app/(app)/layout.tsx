@@ -27,6 +27,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Link href="/visits" className="text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
                 Visits
               </Link>
+              <Link href="/on-call" className="hidden lg:inline text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
+                On-call
+              </Link>
+              <Link href="/controlled-substances" className="hidden xl:inline text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
+                Med log
+              </Link>
               <Link href="/quality" className="hidden sm:inline text-slate-700 hover:text-teal-700 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
                 Quality
               </Link>
@@ -75,8 +81,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="grid grid-cols-5 text-xs font-bold text-slate-700">
           <Link href="/patients" className="py-2 text-center hover:bg-teal-50">Patients</Link>
           <Link href="/visits" className="py-2 text-center hover:bg-teal-50">Visits</Link>
+          <Link href="/on-call" className="py-2 text-center hover:bg-teal-50">On-call</Link>
           <Link href="/quality" className="py-2 text-center hover:bg-teal-50">Quality</Link>
-          <Link href="/decline" className="py-2 text-center hover:bg-teal-50">Decline</Link>
           <Link href="/settings/2fa" className="py-2 text-center hover:bg-teal-50">2FA</Link>
         </div>
       </nav>

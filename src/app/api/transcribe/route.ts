@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getOpenAI } from "@/lib/openai";
+import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 // Languages we offer in the recorder UI. Whisper supports ~50+; this is the curated list.
 const SUPPORTED: Record<string, string> = {

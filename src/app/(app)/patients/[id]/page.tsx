@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { can } from "@/lib/rbac";
+import { verify as verifyBreakGlass, cookieName as bgCookieName } from "@/lib/break-glass";
 import { fullName, ageFrom } from "@/lib/utils";
 import { ESASChart } from "@/components/esas-chart";
 import { PPSChart } from "@/components/pps-chart";
@@ -26,6 +27,8 @@ export default async function PatientPage({
   const session = await auth();
   const { id } = await params;
 
+  if (!session?.user) redirect("/login");
+
   // Check soft-delete + break-glass gate
   const lite = await prisma.patient.findUnique({
     where: { id },
@@ -33,9 +36,15 @@ export default async function PatientPage({
   });
   if (!lite) notFound();
   if (lite.deletedAt) notFound();
+
+  let viaBreakGlass = false;
   if (lite.lockbox) {
     const cookieStore = await cookies();
-    if (!cookieStore.get(`bg-${id}`)) redirect(`/break-glass/${id}`);
+    const c = cookieStore.get(bgCookieName(id))?.value;
+    if (!c || !verifyBreakGlass(c, session.user.id, id)) {
+      redirect(`/break-glass/${id}`);
+    }
+    viaBreakGlass = true;
   }
 
   const patient = await prisma.patient.findUnique({
@@ -58,11 +67,12 @@ export default async function PatientPage({
   if (!patient) notFound();
 
   await audit({
-    userId: session?.user.id,
+    userId: session.user.id,
     patientId: patient.id,
     action: "READ",
     resource: "Patient",
     resourceId: patient.id,
+    metadata: viaBreakGlass ? { viaBreakGlass: true } : undefined,
   });
 
   const latestEsas = patient.esasScores.at(-1);

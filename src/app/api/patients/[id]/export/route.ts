@@ -15,23 +15,28 @@ export async function GET(
   const url = new URL(req.url);
   const format = url.searchParams.get("format") ?? "json";
 
+  // Cap eager loads to prevent OOM on huge charts.
+  const NOTE_CAP = format === "pdf" ? 50 : 1000;
+  const SCORE_CAP = format === "pdf" ? 60 : 5000;
+
   const patient = await prisma.patient.findUnique({
     where: { id },
     include: {
       allergies: true,
       meds: true,
       contacts: true,
-      esasScores: { orderBy: { recordedAt: "asc" } },
-      ppsScores: { orderBy: { recordedAt: "asc" } },
+      esasScores: { orderBy: { recordedAt: "desc" }, take: SCORE_CAP },
+      ppsScores: { orderBy: { recordedAt: "desc" }, take: SCORE_CAP },
       clinicalNotes: {
         orderBy: { createdAt: "desc" },
+        take: NOTE_CAP,
         include: { author: { select: { name: true, role: true } } },
       },
-      photos: true,
+      photos: { take: 100, orderBy: { takenAt: "desc" } },
     },
   });
 
-  if (!patient) return new NextResponse("Not found", { status: 404 });
+  if (!patient || patient.deletedAt) return new NextResponse("Not found", { status: 404 });
 
   await audit({
     userId: session.user.id,

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # Dummy values just to satisfy build-time env checks.
+      # Real values come from Vercel at deploy time.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/db?sslmode=disable
+      AUTH_SECRET: ci-only-not-a-real-secret-ci-only-not-a-real
+      AUTH_TRUST_HOST: "true"
+      OPENAI_API_KEY: sk-ci-placeholder
+      SESSION_IDLE_TIMEOUT_MIN: "15"
+      REDACT_PHI_IN_LOGS: "true"
+      REQUIRE_BREAK_GLASS_REASON: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

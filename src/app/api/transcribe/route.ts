@@ -15,9 +15,21 @@ const SUPPORTED: Record<string, string> = {
   ur: "Urdu",
 };
 
+const RATE_MAX = 30; // per user per hour
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB Whisper limit
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rl = rateLimit(`transcribe:${session.user.id}`, RATE_MAX, RATE_WINDOW_MS);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Try again later." },
+      { status: 429, headers: rateLimitHeaders(rl, RATE_MAX) }
+    );
+  }
 
   const form = await req.formData();
   const audio = form.get("audio");
@@ -25,6 +37,12 @@ export async function POST(req: Request) {
 
   if (!(audio instanceof Blob)) {
     return NextResponse.json({ error: "No audio" }, { status: 400 });
+  }
+  if (audio.size === 0) {
+    return NextResponse.json({ error: "Empty audio" }, { status: 400 });
+  }
+  if (audio.size > MAX_AUDIO_BYTES) {
+    return NextResponse.json({ error: "Audio over 25 MB limit" }, { status: 413 });
   }
   if (!SUPPORTED[language]) {
     return NextResponse.json({ error: "Unsupported language" }, { status: 400 });

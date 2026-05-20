@@ -2,8 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  AudioWaveform,
+  Bot,
+  Check,
+  FileText,
+  Mic,
+  Save,
+  ShieldCheck,
+  Square,
+  WandSparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { queueNote } from "@/lib/outbox";
+import { cn } from "@/lib/utils";
 
 type SoapDraft = {
   subjective: string;
@@ -22,7 +34,14 @@ const LANGUAGES = [
   { code: "pa", label: "Punjabi" },
   { code: "tl", label: "Tagalog" },
   { code: "fr", label: "French" },
+  { code: "es", label: "Spanish" },
+  { code: "zh", label: "Chinese" },
+  { code: "hi", label: "Hindi" },
+  { code: "ar", label: "Arabic" },
+  { code: "ur", label: "Urdu" },
 ];
+
+const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"];
 
 export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   const router = useRouter();
@@ -40,9 +59,7 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
 
   const supportedMime = useMemo(() => {
     if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return "";
-    if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
-    if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
-    return "";
+    return MIME_CANDIDATES.find((mime) => MediaRecorder.isTypeSupported(mime)) ?? "";
   }, []);
 
   const canRecord =
@@ -61,6 +78,14 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [recording, busy, draft]);
 
+  function cleanupStream() {
+    streamRef.current?.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
+    streamRef.current = null;
+  }
+
   async function start() {
     if (!canRecord) {
       toast.error("Recording is not supported in this browser");
@@ -72,32 +97,47 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
       streamRef.current = stream;
       const mr = new MediaRecorder(stream, { mimeType: supportedMime });
       chunksRef.current = [];
-      mr.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
-      mr.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        const blob = new Blob(chunksRef.current, { type: supportedMime });
-        process(blob);
+      mr.ondataavailable = (event) => event.data.size > 0 && chunksRef.current.push(event.data);
+      mr.onerror = () => {
+        cleanupStream();
+        mediaRecorderRef.current = null;
+        setRecording(false);
+        setBusy("idle");
+        toast.error("Recorder stopped unexpectedly");
       };
+      mr.onstop = () => {
+        cleanupStream();
+        mediaRecorderRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: supportedMime });
+        processAudio(blob);
+      };
+      stream.getAudioTracks().forEach((track) => {
+        track.onended = () => {
+          if (mediaRecorderRef.current?.state === "recording") stop();
+        };
+      });
       startedAtRef.current = Date.now();
       mr.start(1000);
       mediaRecorderRef.current = mr;
       setRecording(true);
-    } catch (e) {
+    } catch (error) {
+      cleanupStream();
       toast.error("Microphone access denied");
-      console.error(e);
+      console.error(error);
     }
   }
 
   function stop() {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") {
+      recorder.stop();
+    } else {
+      cleanupStream();
     }
-    streamRef.current?.getTracks().forEach((track) => track.stop());
     setRecording(false);
   }
 
-  async function process(blob: Blob) {
+  async function processAudio(blob: Blob) {
     const durationMs = Date.now() - startedAtRef.current;
     if (durationMs < 1500 || blob.size < 1024) {
       toast.error("Recording too short");
@@ -108,10 +148,10 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
     setBusy("transcribing");
     try {
       const fd = new FormData();
-      fd.append("audio", blob, supportedMime === "audio/mp4" ? "note.mp4" : "note.webm");
+      fd.append("audio", blob, supportedMime.includes("mp4") ? "note.mp4" : "note.webm");
       fd.append("language", language);
       const tRes = await fetch("/api/transcribe", { method: "POST", body: fd });
-      if (!tRes.ok) throw new Error("Transcription failed");
+      if (!tRes.ok) throw new Error(await readApiError(tRes, "Transcription failed"));
       const { transcript: txt, transcriptOriginal: orig } = await tRes.json();
       setTranscript(txt);
       setTranscriptOriginal(orig ?? "");
@@ -122,12 +162,12 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: txt, patientId }),
       });
-      if (!sRes.ok) throw new Error("SOAP structuring failed");
+      if (!sRes.ok) throw new Error(await readApiError(sRes, "SOAP structuring failed"));
       const soap = await sRes.json();
       setDraft(soap);
       toast.success("SOAP draft ready - review and sign");
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (error) {
+      toast.error((error as Error).message);
     } finally {
       setBusy("idle");
     }
@@ -165,16 +205,16 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) throw new Error(await readApiError(res, "Save failed"));
       toast.success(sign ? "Note signed" : "Note saved as draft");
       clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
       router.refresh();
-    } catch (e) {
+    } catch (error) {
       await queueNote({ ...payload, sign });
       window.dispatchEvent(new Event("outbox-changed"));
-      toast.warning(`Save failed (${(e as Error).message}) - queued for sync`);
+      toast.warning(`Save failed (${(error as Error).message}) - queued for sync`);
       clearVisitTimer(patientId);
       setDraft(null);
       setTranscript("");
@@ -184,145 +224,217 @@ export function VoiceNoteRecorder({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
+    <div className="voice-console">
+      <div className="voice-console-top">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className={cn(
+              "relative inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-lg",
+              recording && "recording-ring"
+            )}
+          >
+            {recording ? <AudioWaveform className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-black tracking-tight text-slate-900">Voice capture console</h3>
+              <span className={cn("badge", recording ? "badge-danger" : draft ? "badge-success" : "badge-neutral")}>
+                {recording ? "Recording" : draft ? "SOAP ready" : busy === "idle" ? "Ready" : "Processing"}
+              </span>
+            </div>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              Capture visit narrative, structure SOAP, then save or sign.
+            </p>
+          </div>
+        </div>
+        <div className={cn("waveform", recording && "is-recording")} aria-hidden="true">
+          {Array.from({ length: 18 }).map((_, index) => (
+            <span key={index} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-4 p-4">
         {!canRecord && (
-          <div className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
             Voice recording unavailable in this browser. Use Chrome, Edge, or Safari 17+.
           </div>
         )}
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          disabled={recording || busy !== "idle"}
-          className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
-          aria-label="Recording language"
-        >
-          {LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={visitType}
-          onChange={(e) => setVisitType(e.target.value)}
-          disabled={recording || busy !== "idle"}
-          className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
-          aria-label="Visit type"
-        >
-          <option value="RN_VISIT">RN visit</option>
-          <option value="MD_VISIT">MD visit</option>
-          <option value="SW_VISIT">SW visit</option>
-          <option value="CHAPLAIN_VISIT">Chaplain visit</option>
-          <option value="AIDE_VISIT">Aide visit</option>
-          <option value="VOLUNTEER_VISIT">Volunteer visit</option>
-          <option value="IDG_MEETING">IDG meeting</option>
-          <option value="PHONE">Phone</option>
-        </select>
-        {!recording ? (
-          <button
-            type="button"
-            onClick={start}
-            disabled={busy !== "idle" || !canRecord}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            <span className="w-2 h-2 rounded-full bg-white" />
-            Start Recording
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={stop}
-            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 flex items-center gap-2 animate-pulse"
-          >
-            <span className="w-2 h-2 rounded-sm bg-white" />
-            Stop & Process
-          </button>
-        )}
-        {busy !== "idle" && (
-          <span className="text-sm text-slate-500 animate-pulse">
-            {busy === "transcribing" && "Transcribing audio..."}
-            {busy === "structuring" && "AI structuring SOAP..."}
-            {busy === "saving" && "Saving..."}
-          </span>
-        )}
-      </div>
 
-      {transcript && (
-        <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-2">
-          <div>
-            <div className="text-xs text-slate-500 mb-1">Transcript (English)</div>
-            <div className="text-slate-700">{transcript}</div>
-          </div>
-          {transcriptOriginal && transcriptOriginal !== transcript && (
-            <div className="pt-2 border-t border-slate-200">
-              <div className="text-xs text-slate-500 mb-1">
-                Original ({LANGUAGES.find((l) => l.code === language)?.label})
-              </div>
-              <div className="text-slate-700">{transcriptOriginal}</div>
-            </div>
+        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Language</span>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              disabled={recording || busy !== "idle"}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--ring)]"
+              aria-label="Recording language"
+            >
+              {LANGUAGES.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Visit type</span>
+            <select
+              value={visitType}
+              onChange={(e) => setVisitType(e.target.value)}
+              disabled={recording || busy !== "idle"}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--ring)]"
+              aria-label="Visit type"
+            >
+              <option value="RN_VISIT">RN visit</option>
+              <option value="MD_VISIT">MD visit</option>
+              <option value="SW_VISIT">SW visit</option>
+              <option value="CHAPLAIN_VISIT">Chaplain visit</option>
+              <option value="AIDE_VISIT">Aide visit</option>
+              <option value="VOLUNTEER_VISIT">Volunteer visit</option>
+              <option value="IDG_MEETING">IDG meeting</option>
+              <option value="PHONE">Phone</option>
+            </select>
+          </label>
+          {!recording ? (
+            <button
+              type="button"
+              onClick={start}
+              disabled={busy !== "idle" || !canRecord}
+              className="btn-primary mt-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50"
+            >
+              <Mic className="h-4 w-4" />
+              Start
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={stop}
+              className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
+            >
+              <Square className="h-4 w-4 fill-white" />
+              Stop and process
+            </button>
           )}
         </div>
-      )}
 
-      {draft && (
-        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-          <SoapField label="Subjective" value={draft.subjective} onChange={(v) => setDraft({ ...draft, subjective: v })} />
-          <SoapField label="Objective" value={draft.objective} onChange={(v) => setDraft({ ...draft, objective: v })} />
-          <SoapField label="Assessment" value={draft.assessment} onChange={(v) => setDraft({ ...draft, assessment: v })} />
-          <SoapField label="Plan" value={draft.plan} onChange={(v) => setDraft({ ...draft, plan: v })} />
+        <div className="pipeline">
+          <PipelineStep label="Capture" active={recording} done={Boolean(transcript || draft)} />
+          <PipelineStep label="Transcribe" active={busy === "transcribing"} done={Boolean(transcript)} />
+          <PipelineStep label="SOAP" active={busy === "structuring"} done={Boolean(draft)} />
+          <PipelineStep label="Ready" active={Boolean(draft)} done={Boolean(draft)} />
+        </div>
 
-          {(draft.esas || draft.pps !== undefined || draft.medChanges?.length) && (
-            <div className="p-3 bg-slate-50 text-xs space-y-1">
-              <div className="font-semibold text-slate-700 mb-1">AI-extracted data</div>
-              {draft.pps !== undefined && draft.pps !== null && (
-                <div>PPS: <span className="font-mono">{draft.pps}</span></div>
-              )}
-              {draft.esas && <div>ESAS: <span className="font-mono">{JSON.stringify(draft.esas)}</span></div>}
-              {draft.medChanges && draft.medChanges.length > 0 && <div>Med changes: {draft.medChanges.join("; ")}</div>}
-              {draft.icd10 && draft.icd10.length > 0 && (
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">ICD-10 codes</label>
-                  <input
-                    value={draft.icd10.map(formatIcd10).join(", ")}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        icd10: e.target.value
-                          .split(",")
-                          .map((v) => v.replace(/\([^)]*\)/g, "").trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    className="w-full px-2 py-1.5 text-xs font-mono border border-slate-200 rounded bg-white"
-                  />
+        {transcript && (
+          <details className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+            <summary className="flex cursor-pointer list-none items-center gap-2 font-black text-slate-800">
+              <FileText className="h-4 w-4 text-teal-700" />
+              Source transcript
+            </summary>
+            <div className="mt-3 space-y-2">
+              <div>
+                <div className="mb-1 text-xs text-slate-500">Transcript (English)</div>
+                <div className="text-slate-700">{transcript}</div>
+              </div>
+              {transcriptOriginal && transcriptOriginal !== transcript && (
+                <div className="border-t border-slate-200 pt-2">
+                  <div className="mb-1 text-xs text-slate-500">
+                    Original ({LANGUAGES.find((item) => item.code === language)?.label})
+                  </div>
+                  <div className="text-slate-700" dir={["ar", "ur"].includes(language) ? "rtl" : "ltr"}>
+                    {transcriptOriginal}
+                  </div>
                 </div>
               )}
-              {draft.confidence !== undefined && <div>Confidence: {Math.round((draft.confidence ?? 0) * 100)}%</div>}
             </div>
-          )}
+          </details>
+        )}
 
-          <div className="p-3 flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => save(false)}
-              disabled={busy !== "idle"}
-              className="px-4 py-2 text-sm rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Save Draft
-            </button>
-            <button
-              type="button"
-              onClick={() => save(true)}
-              disabled={busy !== "idle"}
-              className="px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              Sign & Save
-            </button>
+        {draft && (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="flex items-center gap-2 border-b border-slate-200 bg-[var(--surface-muted)] px-4 py-3">
+              <WandSparkles className="h-4 w-4 text-teal-700" />
+              <div className="text-sm font-black text-slate-900">SOAP worksheet</div>
+            </div>
+            <div className="soap-grid p-3">
+              <SoapField label="Subjective" value={draft.subjective} onChange={(value) => setDraft({ ...draft, subjective: value })} />
+              <SoapField label="Objective" value={draft.objective} onChange={(value) => setDraft({ ...draft, objective: value })} />
+              <SoapField label="Assessment" value={draft.assessment} onChange={(value) => setDraft({ ...draft, assessment: value })} />
+              <SoapField label="Plan" value={draft.plan} onChange={(value) => setDraft({ ...draft, plan: value })} />
+            </div>
+
+            {(draft.esas || draft.pps !== undefined || draft.medChanges?.length) && (
+              <div className="mx-3 mb-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                <div className="mb-1 flex items-center gap-2 font-black text-slate-700">
+                  <Bot className="h-3.5 w-3.5" />
+                  AI-extracted data
+                </div>
+                {draft.pps !== undefined && draft.pps !== null && (
+                  <div>
+                    PPS: <span className="font-mono">{draft.pps}</span>
+                  </div>
+                )}
+                {draft.esas && (
+                  <div>
+                    ESAS: <span className="font-mono">{JSON.stringify(draft.esas)}</span>
+                  </div>
+                )}
+                {draft.medChanges && draft.medChanges.length > 0 && <div>Med changes: {draft.medChanges.join("; ")}</div>}
+                {draft.icd10 && draft.icd10.length > 0 && (
+                  <div>
+                    <label className="mb-1 block font-semibold text-slate-700">ICD-10 codes</label>
+                    <input
+                      value={draft.icd10.map(formatIcd10).join(", ")}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          icd10: event.target.value
+                            .split(",")
+                            .map((value) => value.replace(/\([^)]*\)/g, "").trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs"
+                    />
+                  </div>
+                )}
+                {draft.confidence !== undefined && <div>Confidence: {Math.round((draft.confidence ?? 0) * 100)}%</div>}
+              </div>
+            )}
+
+            <div className="sticky-action-bar flex gap-2 justify-end p-3">
+              <button
+                type="button"
+                onClick={() => save(false)}
+                disabled={busy !== "idle"}
+                className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                Save Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => save(true)}
+                disabled={busy !== "idle"}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Sign & Save
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PipelineStep({ label, active, done }: { label: string; active: boolean; done: boolean }) {
+  return (
+    <div className={cn("pipeline-step", active && "is-active")}>
+      {done ? <Check className="mb-1 h-3.5 w-3.5" /> : <span className="mb-1 block h-3.5 w-3.5 rounded-full bg-[var(--surface-muted)]" />}
+      {label}
     </div>
   );
 }
@@ -334,18 +446,16 @@ function SoapField({
 }: {
   label: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div className="p-3">
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-        {label}
-      </label>
+    <div className="rounded-lg border border-slate-200 bg-[var(--surface-muted)] p-3">
+      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>
       <textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded resize-y focus:outline-none focus:ring-1 focus:ring-slate-900"
+        onChange={(event) => onChange(event.target.value)}
+        rows={4}
+        className="min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:ring-4 focus:ring-[var(--ring)]"
       />
     </div>
   );
@@ -357,6 +467,15 @@ function formatIcd10(value: string | { code: string; confidence?: number }) {
     return `${value.code} (${Math.round(value.confidence * 100)}%)`;
   }
   return value.code;
+}
+
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const body = (await response.json()) as { error?: string };
+    return body.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function timerKey(patientId: string) {

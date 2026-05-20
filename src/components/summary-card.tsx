@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { SkeletonLines } from "@/components/ui/skeleton";
 
 export function SummaryCard({ patientId }: { patientId: string }) {
   const [summary, setSummary] = useState("");
@@ -27,33 +29,27 @@ export function SummaryCard({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Handoff summary
-        </span>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-bold uppercase tracking-wide soft">AI handoff</span>
         <div className="flex gap-2">
           {summary && (
-            <button
-              type="button"
-              onClick={copy}
-              className="text-xs font-semibold text-teal-700 hover:text-teal-900"
-            >
+            <button type="button" onClick={copy} className="btn-secondary inline-flex items-center gap-1 px-2.5 py-1.5 text-xs">
+              <Copy className="h-3.5 w-3.5" />
               Copy
             </button>
           )}
-          <button
-            type="button"
-            onClick={generate}
-            disabled={loading}
-            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-50"
-          >
-            {loading ? "Generating..." : summary ? "Regenerate" : "Generate"}
+          <button type="button" onClick={generate} disabled={loading} className="btn-primary inline-flex items-center gap-1 px-2.5 py-1.5 text-xs disabled:opacity-50">
+            <Sparkles className="h-3.5 w-3.5" />
+            {loading ? "Generating" : summary ? "Regenerate" : "Generate"}
           </button>
         </div>
       </div>
+      {loading && <SkeletonLines lines={4} />}
       {summary ? (
-        <p className="text-sm text-slate-800 leading-relaxed bg-stone-50 rounded-lg p-3">{summary}</p>
+        <p className="rounded-lg border hairline bg-[var(--surface-muted)] p-3 text-sm leading-relaxed">{summary}</p>
+      ) : !loading ? (
+        <p className="text-sm muted">No generated handoff yet.</p>
       ) : null}
     </div>
   );

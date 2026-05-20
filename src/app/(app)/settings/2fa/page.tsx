@@ -25,7 +25,7 @@ export default async function TwoFaPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold text-slate-900 mb-6">Two-Factor Authentication</h1>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight">Two-Factor Authentication</h1>
 
       {session.user.totpRequired && !session.user.totpVerified && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
@@ -34,15 +34,15 @@ export default async function TwoFaPage() {
       )}
 
       {user.totpEnabled ? (
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
+        <div className="surface-card p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-emerald-700 text-2xl">OK</span>
-            <span className="font-semibold text-slate-900">2FA enabled</span>
+            <span className="font-semibold">2FA enabled</span>
           </div>
           <Disable2FA />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-5">
+        <div className="surface-card p-5 space-y-5">
           {qrDataUrl && (
             <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-stone-100 rounded-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}

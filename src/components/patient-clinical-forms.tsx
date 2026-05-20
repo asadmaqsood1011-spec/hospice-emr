@@ -27,7 +27,7 @@ export function PatientClinicalForms({
 
 function ScoreForm({ patientId }: { patientId: string }) {
   return (
-    <form action={addScores} className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+    <form action={addScores} className="surface-card p-5 space-y-3">
       <input type="hidden" name="patientId" value={patientId} />
       <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">Add Scores</h2>
       <div className="grid grid-cols-2 gap-2">
@@ -49,7 +49,7 @@ function ScoreForm({ patientId }: { patientId: string }) {
 
 function AllergyForm({ patientId }: { patientId: string }) {
   return (
-    <form action={addAllergy} className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+    <form action={addAllergy} className="surface-card p-5 space-y-3">
       <input type="hidden" name="patientId" value={patientId} />
       <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">Add Allergy</h2>
       <Field name="substance" label="Substance" required placeholder="Penicillin" />
@@ -62,7 +62,7 @@ function AllergyForm({ patientId }: { patientId: string }) {
 
 function CaregiverForm({ patientId }: { patientId: string }) {
   return (
-    <form action={addCaregiver} className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+    <form action={addCaregiver} className="surface-card p-5 space-y-3">
       <input type="hidden" name="patientId" value={patientId} />
       <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">Add Caregiver</h2>
       <Field name="name" label="Name" required placeholder="Sarah Whitfield" />
@@ -102,14 +102,14 @@ function MedicationForm({ patientId }: { patientId: string }) {
   }
 
   return (
-    <form action={addMedication} className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
+    <form action={addMedication} className="surface-card p-5 space-y-3">
       <input type="hidden" name="patientId" value={patientId} />
       <input type="hidden" name="rxcui" value={rxcui} />
       <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">Add Medication</h2>
       <div className="relative">
         <Field name="name" label="Medication" required value={q} onChange={setQ} placeholder="Morphine sulfate" />
         {results.length > 0 && (
-          <div className="absolute z-20 mt-1 w-full rounded-lg border border-stone-200 bg-white shadow-lg overflow-hidden">
+          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border hairline bg-[var(--surface)] shadow-lg">
             {results.slice(0, 6).map((item) => (
               <button
                 key={item.rxcui}
@@ -175,7 +175,7 @@ function Field({
         step={step}
         value={value}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
-        className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700"
+        className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
       />
     </label>
   );
@@ -185,7 +185,7 @@ function Select({ label, name, options }: { label: string; name: string; options
   return (
     <label className="block text-xs font-semibold text-slate-700">
       {label}
-      <select name={name} className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900">
+      <select name={name} className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm">
         {options.map((option) => (
           <option key={option} value={option}>
             {option || "-"}
@@ -198,7 +198,7 @@ function Select({ label, name, options }: { label: string; name: string; options
 
 function Submit({ children }: { children: React.ReactNode }) {
   return (
-    <button type="submit" className="w-full px-3 py-2 rounded-lg text-sm font-semibold bg-teal-700 text-white hover:bg-teal-800">
+    <button type="submit" className="btn-primary w-full px-3 py-2 text-sm">
       {children}
     </button>
   );

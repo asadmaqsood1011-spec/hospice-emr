@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ClipboardList, Pill } from "lucide-react";
 import { ControlledSubstanceForm } from "./form";
 
 export default async function ControlledSubstancesPage() {
@@ -20,12 +23,16 @@ export default async function ControlledSubstancesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Controlled Substances</h1>
-        <p className="mt-1 text-sm font-medium text-slate-600">Count, administer, receive, and waste events are audit logged.</p>
+        <div className="inline-flex items-center gap-2 rounded-lg border hairline bg-[var(--surface)] px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[var(--primary)]">
+          <Pill className="h-3.5 w-3.5" />
+          Medication ledger
+        </div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Controlled Substances</h1>
+        <p className="mt-1 text-sm muted">Count, administer, receive, and waste events are audit logged.</p>
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold text-slate-900">New ledger entry</h2>
+      <section className="surface-card p-5">
+        <h2 className="mb-3 text-sm font-semibold">New ledger entry</h2>
         <ControlledSubstanceForm
           meds={meds.map((m) => ({
             id: m.id,
@@ -35,13 +42,15 @@ export default async function ControlledSubstancesPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div className="border-b border-stone-200 px-5 py-3">
-          <h2 className="text-sm font-bold text-slate-900">Recent ledger</h2>
+      <section className="panel">
+        <div className="border-b hairline px-5 py-3">
+          <h2 className="text-sm font-semibold">Recent ledger</h2>
         </div>
-        <div className="divide-y divide-stone-100">
+        <div className="divide-y divide-[var(--border)]">
           {logs.length === 0 ? (
-            <div className="px-5 py-8 text-sm text-slate-500">No controlled-substance events yet.</div>
+            <div className="p-6">
+              <EmptyState icon={ClipboardList} title="No ledger events" hint="Controlled-substance events appear here after count, waste, receive, or administer actions." />
+            </div>
           ) : (
             logs.map((log) => <LedgerRow key={log.id} log={log} />)
           )}
@@ -66,17 +75,18 @@ function LedgerRow({ log }: { log: LedgerLog }) {
   const metadata = (log.metadata ?? {}) as Record<string, unknown>;
   return (
     <div className="grid gap-2 px-5 py-3 text-sm md:grid-cols-[160px_1fr_180px_180px]">
-      <div className="font-mono text-xs text-slate-500">{new Date(log.ts).toLocaleString()}</div>
+      <div className="font-mono text-xs muted">{new Date(log.ts).toLocaleString()}</div>
       <div>
-        <div className="font-semibold text-slate-900">
-          {String(metadata.eventType ?? "event").toUpperCase()} - {String(metadata.medicationName ?? "Medication")}
+        <div className="flex flex-wrap items-center gap-2 font-semibold">
+          <Badge tone="info">{String(metadata.eventType ?? "event").toUpperCase()}</Badge>
+          <span>{String(metadata.medicationName ?? "Medication")}</span>
         </div>
-        <div className="text-slate-600">
+        <div className="muted">
           {log.patient ? `${log.patient.lastName}, ${log.patient.firstName} (${log.patient.mrn})` : "No patient"} - Qty {String(metadata.quantity ?? "-")}
         </div>
       </div>
-      <div className="text-slate-600">{log.user ? `${log.user.name} (${log.user.role})` : "System"}</div>
-      <div className="text-slate-600">Witness: {String(metadata.witness ?? "none")}</div>
+      <div className="muted">{log.user ? `${log.user.name} (${log.user.role})` : "System"}</div>
+      <div className="muted">Witness: {String(metadata.witness ?? "none")}</div>
     </div>
   );
 }

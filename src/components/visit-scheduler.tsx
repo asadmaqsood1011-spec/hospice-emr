@@ -11,10 +11,10 @@ export function VisitScheduler({ patients }: { patients: PatientOption[] }) {
   const defaultDate = new Date(Date.now() + 60 * 60000).toISOString().slice(0, 16);
 
   return (
-    <form action={scheduleVisit} className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+    <form action={scheduleVisit} className="surface-card grid grid-cols-1 items-end gap-3 p-4 md:grid-cols-5">
       <label className="block text-xs font-semibold text-slate-700">
         Patient
-        <select name="patientId" required className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900">
+        <select name="patientId" required className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm">
           {patients.map((patient) => (
             <option key={patient.id} value={patient.id}>{patient.label}</option>
           ))}
@@ -22,7 +22,7 @@ export function VisitScheduler({ patients }: { patients: PatientOption[] }) {
       </label>
       <label className="block text-xs font-semibold text-slate-700">
         Type
-        <select name="type" defaultValue="RN_VISIT" className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900">
+        <select name="type" defaultValue="RN_VISIT" className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm">
           <option value="RN_VISIT">RN visit</option>
           <option value="MD_VISIT">MD visit</option>
           <option value="SW_VISIT">SW visit</option>
@@ -35,13 +35,13 @@ export function VisitScheduler({ patients }: { patients: PatientOption[] }) {
       </label>
       <label className="block text-xs font-semibold text-slate-700">
         Time
-        <input name="scheduledFor" type="datetime-local" required defaultValue={defaultDate} className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900" />
+        <input name="scheduledFor" type="datetime-local" required defaultValue={defaultDate} className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm" />
       </label>
       <label className="block text-xs font-semibold text-slate-700">
         Location
-        <input name="location" placeholder="Home, phone, hospice" className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900" />
+        <input name="location" placeholder="Home, phone, hospice" className="mt-1 w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 text-sm" />
       </label>
-      <button type="submit" className="px-4 py-2 rounded-lg text-sm font-semibold bg-teal-700 text-white hover:bg-teal-800">
+      <button type="submit" className="btn-primary px-4 py-2 text-sm">
         Schedule
       </button>
     </form>

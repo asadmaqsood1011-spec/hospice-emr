@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PhoneCall, Users } from "lucide-react";
 import { HandoffForm } from "./handoff-form";
 
 export default async function OnCallPage() {
@@ -42,20 +45,24 @@ export default async function OnCallPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">On-call Handoff</h1>
-        <p className="mt-1 text-sm font-medium text-slate-600">After-hours snapshot: symptoms, PPS, meds, recent note, and handoff comments.</p>
+        <div className="inline-flex items-center gap-2 rounded-lg border hairline bg-[var(--surface)] px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[var(--primary)]">
+          <PhoneCall className="h-3.5 w-3.5" />
+          After-hours board
+        </div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">On-call Handoff</h1>
+        <p className="mt-1 text-sm muted">After-hours snapshot: symptoms, PPS, meds, recent note, and handoff comments.</p>
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold text-slate-900">Current on-call contacts</h2>
+      <section className="surface-card p-5">
+        <h2 className="mb-3 text-sm font-semibold">Current on-call contacts</h2>
         {onCall.length === 0 ? (
-          <div className="text-sm text-slate-500">No users have on-call phone numbers configured.</div>
+          <EmptyState icon={Users} title="No on-call contacts" hint="Configure on-call phone numbers on users to populate this board." />
         ) : (
           <div className="grid gap-2 md:grid-cols-3">
             {onCall.map((u) => (
-              <div key={`${u.name}-${u.oncallPhone}`} className="rounded-lg border border-stone-200 px-3 py-2 text-sm">
-                <div className="font-semibold text-slate-900">{u.name}</div>
-                <div className="text-slate-600">{u.role} - {u.oncallPhone}</div>
+              <div key={`${u.name}-${u.oncallPhone}`} className="rounded-lg border hairline bg-[var(--surface-muted)] px-3 py-2 text-sm">
+                <div className="font-semibold">{u.name}</div>
+                <div className="muted">{u.role} - {u.oncallPhone}</div>
               </div>
             ))}
           </div>
@@ -69,38 +76,38 @@ export default async function OnCallPage() {
           const pain = latestEsas?.pain;
           const rows = handoffByPatient.get(patient.id) ?? [];
           return (
-            <article key={patient.id} className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+            <article key={patient.id} className="surface-card p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <Link href={`/patients/${patient.id}`} className="text-lg font-bold text-slate-900 hover:text-teal-700">
+                  <Link href={`/patients/${patient.id}`} className="text-lg font-bold hover:text-[var(--primary)]">
                     {patient.lastName}, {patient.firstName}
                   </Link>
-                  <div className="mt-1 text-sm text-slate-600">
+                  <div className="mt-1 text-sm muted">
                     MRN {patient.mrn} - {patient.codeStatus.replace(/_/g, "/")} - {patient.levelOfCare.replace(/_/g, " ")}
                   </div>
                 </div>
                 <div className="flex gap-2 text-xs font-bold">
-                  <span className={scoreClass(pain)}>Pain {pain ?? "-"}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-slate-700">PPS {latestPps?.score ?? "-"}%</span>
-                  {patient.lockbox && <span className="rounded bg-red-100 px-2 py-1 text-red-700">Lockbox</span>}
+                  <Badge tone={painTone(pain)}>Pain {pain ?? "-"}</Badge>
+                  <Badge>PPS {latestPps?.score ?? "-"}%</Badge>
+                  {patient.lockbox && <Badge tone="danger">Lockbox</Badge>}
                 </div>
               </div>
               <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Active meds</div>
-                  <div className="mt-1 text-slate-700">{patient.meds.map((m) => m.name).join(", ") || "None"}</div>
+                  <div className="text-xs font-bold uppercase tracking-wider muted">Active meds</div>
+                  <div className="mt-1">{patient.meds.map((m) => m.name).join(", ") || "None"}</div>
                 </div>
                 <div className="md:col-span-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Latest note</div>
-                  <div className="mt-1 text-slate-700">{patient.clinicalNotes[0]?.assessment ?? "No recent assessment"}</div>
+                  <div className="text-xs font-bold uppercase tracking-wider muted">Latest note</div>
+                  <div className="mt-1">{patient.clinicalNotes[0]?.assessment ?? "No recent assessment"}</div>
                 </div>
               </div>
               {rows.length > 0 && (
-                <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+                <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3 text-sm">
                   {rows.slice(0, 3).map((row) => {
                     const meta = (row.metadata ?? {}) as Record<string, unknown>;
                     return (
-                      <div key={row.id} className="border-b border-slate-200 py-2 last:border-0">
+                      <div key={row.id} className="border-b hairline py-2 last:border-0">
                         <span className="font-semibold">{row.user?.name ?? "Team"}:</span> {String(meta.message ?? "")}
                       </div>
                     );
@@ -116,9 +123,9 @@ export default async function OnCallPage() {
   );
 }
 
-function scoreClass(pain: number | undefined) {
-  if (pain === undefined) return "rounded bg-slate-100 px-2 py-1 text-slate-700";
-  if (pain >= 7) return "rounded bg-red-100 px-2 py-1 text-red-700";
-  if (pain >= 4) return "rounded bg-amber-100 px-2 py-1 text-amber-700";
-  return "rounded bg-emerald-100 px-2 py-1 text-emerald-700";
+function painTone(pain: number | undefined) {
+  if (pain === undefined) return "neutral";
+  if (pain >= 7) return "danger";
+  if (pain >= 4) return "warning";
+  return "success";
 }

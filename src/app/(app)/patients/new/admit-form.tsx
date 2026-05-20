@@ -9,7 +9,7 @@ export function AdmitForm() {
   return (
     <form action={action} className="space-y-6">
       {state?.error && (
-        <div className="bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg px-3 py-2 font-medium">
+        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
           {state.error}
         </div>
       )}
@@ -46,8 +46,8 @@ export function AdmitForm() {
             labelFn={(v) => v.replace(/_/g, " ")}
           />
         </Grid>
-        <label className="flex items-center gap-2 mt-3 text-sm font-medium text-slate-800">
-          <input type="checkbox" name="consentOnFile" className="w-4 h-4 accent-teal-700" />
+        <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-800">
+          <input type="checkbox" name="consentOnFile" className="h-4 w-4 accent-teal-700" />
           Patient consent on file
         </label>
       </Section>
@@ -60,18 +60,11 @@ export function AdmitForm() {
         </Grid>
       </Section>
 
-      <div className="flex gap-3 justify-end">
-        <a
-          href="/patients"
-          className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-stone-300 text-slate-800 hover:bg-stone-100"
-        >
+      <div className="flex justify-end gap-3">
+        <a href="/patients" className="btn-secondary px-4 py-2.5 text-sm">
           Cancel
         </a>
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-50 shadow-sm"
-        >
+        <button type="submit" disabled={pending} className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50">
           {pending ? "Admitting..." : "Admit Patient"}
         </button>
       </div>
@@ -81,15 +74,15 @@ export function AdmitForm() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-      <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-4">{title}</h2>
+    <div className="surface-card p-5">
+      <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">{title}</h2>
       {children}
     </div>
   );
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
+  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>;
 }
 
 function Field({
@@ -111,15 +104,15 @@ function Field({
 }) {
   return (
     <div className={full ? "sm:col-span-2" : ""}>
-      <label className="block text-sm font-semibold text-slate-800 mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-800">{label}</label>
       <input
         name={name}
         type={type}
         placeholder={placeholder}
         required={required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
+        className="w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
       />
-      {err && <p className="text-xs text-red-700 mt-1">{err.join(", ")}</p>}
+      {err && <p className="mt-1 text-xs text-red-700">{err.join(", ")}</p>}
     </div>
   );
 }
@@ -139,15 +132,15 @@ function Select({
 }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-slate-800 mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-800">{label}</label>
       <select
         name={name}
         required={required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
+        className="w-full rounded-lg border hairline bg-[var(--surface)] px-3 py-2 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
       >
         {options.map((o) => (
           <option key={o} value={o}>
-            {o === "" ? "—" : labelFn ? labelFn(o) : o}
+            {o === "" ? "--" : labelFn ? labelFn(o) : o}
           </option>
         ))}
       </select>

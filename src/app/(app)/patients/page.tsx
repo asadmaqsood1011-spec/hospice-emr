@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { FilePlus2, Search, Users } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { fullName, ageFrom } from "@/lib/utils";
 import { SearchShortcut } from "@/components/search-shortcut";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function PatientsPage({
   searchParams,
@@ -51,36 +54,42 @@ export default async function PatientsPage({
   });
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Patients</h1>
-          <p className="text-sm font-medium text-slate-600 mt-1">{patients.length} on service</p>
+          <div className="inline-flex items-center gap-2 rounded-lg border hairline bg-[var(--surface)] px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[var(--primary)]">
+            <Users className="h-3.5 w-3.5" />
+            Census command
+          </div>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Patients</h1>
+          <p className="mt-1 text-sm muted">{patients.length} on service</p>
         </div>
-        <Link
-          href="/patients/new"
-          className="bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-800 shadow-sm transition-colors"
-        >
-          + Admit Patient
+        <Link href="/patients/new" className="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm shadow-sm">
+          <FilePlus2 className="h-4 w-4" />
+          Admit Patient
         </Link>
       </div>
 
-      <form className="mb-4">
-        <input
-          id="patient-search"
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search by name or MRN..."
-          className="w-full md:w-80 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
-        />
+      <form className="panel flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative block w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 soft" />
+          <input
+            id="patient-search"
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Search by name or MRN..."
+            className="w-full rounded-lg border hairline bg-[var(--surface)] py-2.5 pl-9 pr-3 text-sm font-medium text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--ring)]"
+          />
+        </label>
+        <span className="hidden text-xs font-semibold uppercase tracking-wide muted sm:inline">Press / or Ctrl K</span>
         <SearchShortcut inputId="patient-search" />
       </form>
 
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+      <div className="panel overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-stone-100 border-b-2 border-stone-200">
-            <tr className="text-left text-xs uppercase tracking-wider text-slate-700 font-bold">
+          <thead className="border-b hairline bg-[var(--surface-muted)]">
+            <tr className="text-left text-[11px] font-bold uppercase tracking-wide muted">
               <th className="px-4 py-3">MRN</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Age</th>
@@ -90,29 +99,22 @@ export default async function PatientsPage({
               <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-200">
+          <tbody className="divide-y divide-[var(--border)]">
             {patients.map((p) => (
-              <tr key={p.id} className="hover:bg-teal-50 transition-colors">
-                <td className="px-4 py-3 font-mono text-xs text-slate-700">{p.mrn}</td>
+              <tr key={p.id} className="transition-colors hover:bg-[var(--surface-muted)]">
+                <td className="px-4 py-3 font-mono text-xs muted">{p.mrn}</td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/patients/${p.id}`}
-                    className="font-semibold text-teal-800 hover:text-teal-600 hover:underline"
-                  >
+                  <Link href={`/patients/${p.id}`} className="font-semibold text-[var(--primary)] hover:underline">
                     {fullName(p)}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-slate-800 font-medium">{ageFrom(p.dob)}</td>
-                <td className="px-4 py-3 text-slate-800">{p.primaryDx ?? "—"}</td>
+                <td className="px-4 py-3 font-medium">{ageFrom(p.dob)}</td>
+                <td className="px-4 py-3">{p.primaryDx ?? "--"}</td>
                 <td className="px-4 py-3">
-                  <span className="text-xs font-medium bg-stone-200 text-slate-800 px-2 py-1 rounded">
-                    {p.levelOfCare.replace(/_/g, " ")}
-                  </span>
+                  <Badge>{p.levelOfCare.replace(/_/g, " ")}</Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-1 rounded">
-                    {p.codeStatus.replace(/_/g, "/")}
-                  </span>
+                  <Badge tone="warning">{p.codeStatus.replace(/_/g, "/")}</Badge>
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={p.status} />
@@ -121,8 +123,12 @@ export default async function PatientsPage({
             ))}
             {patients.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-500 font-medium">
-                  No patients found.
+                <td colSpan={7} className="p-6">
+                  <EmptyState
+                    icon={Search}
+                    title="No patients found"
+                    hint="Clear search or admit patient to add them to active census."
+                  />
                 </td>
               </tr>
             )}
@@ -134,11 +140,6 @@ export default async function PatientsPage({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "ACTIVE"
-      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-      : status === "DECEASED"
-        ? "bg-stone-300 text-slate-800 border border-stone-400"
-        : "bg-amber-100 text-amber-800 border border-amber-200";
-  return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{status}</span>;
+  const tone = status === "ACTIVE" ? "success" : status === "DECEASED" ? "neutral" : "warning";
+  return <Badge tone={tone}>{status}</Badge>;
 }

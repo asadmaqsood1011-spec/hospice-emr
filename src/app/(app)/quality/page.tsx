@@ -1,39 +1,49 @@
+import { BarChart3, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { computeHisMeasures } from "@/lib/his";
+import { Badge } from "@/components/ui/badge";
 
 export default async function QualityPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (session.user.role !== "ADMIN") redirect("/patients");
 
   const measures = await computeHisMeasures();
-  const avg = measures.reduce((s, m) => s + m.rate, 0) / measures.length;
+  const avg = measures.length ? measures.reduce((s, m) => s + m.rate, 0) / measures.length : 0;
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-slate-900 mb-4">Quality Measures (HIS)</h1>
-
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
-        <div className="flex items-baseline gap-3">
-          <span className="text-5xl font-bold text-teal-700">{Math.round(avg)}%</span>
-          <span className="text-sm font-medium text-slate-600">composite score</span>
+    <div className="space-y-6">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-lg border hairline bg-[var(--surface)] px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[var(--primary)]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Admin only
+          </div>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Quality Measures</h1>
+          <p className="mt-1 text-sm muted">HIS-style pilot quality view. Hidden from clinician nav.</p>
+        </div>
+        <div className="surface-card px-5 py-4 text-right">
+          <div className="text-3xl font-bold tabular-nums text-[var(--primary)]">{Math.round(avg)}%</div>
+          <div className="text-xs font-semibold uppercase tracking-wide muted">Composite</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {measures.map((m) => (
-          <div key={m.key} className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-bold text-slate-900">{m.label}</h3>
+          <article key={m.key} className="surface-card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-sm font-semibold">{m.label}</h2>
               <RateBadge rate={m.rate} />
             </div>
-            <div className="text-xs font-mono text-slate-700">
+            <div className="mt-3 flex items-center gap-2 text-xs font-mono muted">
+              <BarChart3 className="h-4 w-4" />
               {m.numerator} / {m.denominator}
             </div>
-            <div className="mt-2 h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
               <div className={`h-full ${barColor(m.rate)}`} style={{ width: `${m.rate}%` }} />
             </div>
-          </div>
+          </article>
         ))}
       </div>
     </div>
@@ -41,16 +51,8 @@ export default async function QualityPage() {
 }
 
 function RateBadge({ rate }: { rate: number }) {
-  const cls = rate >= 85
-    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-    : rate >= 70
-      ? "bg-amber-100 text-amber-900 border-amber-300"
-      : "bg-red-100 text-red-800 border-red-300";
-  return (
-    <span className={`text-sm font-bold px-2 py-0.5 rounded border ${cls}`}>
-      {rate}%
-    </span>
-  );
+  const tone = rate >= 85 ? "success" : rate >= 70 ? "warning" : "danger";
+  return <Badge tone={tone}>{rate}%</Badge>;
 }
 
 function barColor(rate: number) {

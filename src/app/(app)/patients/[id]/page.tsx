@@ -1,6 +1,21 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import {
+  Activity,
+  ArrowLeft,
+  Camera,
+  CheckCircle2,
+  Download,
+  FileText,
+  HeartPulse,
+  LockKeyhole,
+  Mic,
+  Pill,
+  ShieldAlert,
+  Stethoscope,
+  Users,
+} from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
@@ -18,6 +33,7 @@ import { PhotoUpload } from "@/components/photo-upload";
 import { RecentPatientTracker } from "@/components/recent-patients";
 import { SummaryCard } from "@/components/summary-card";
 import { VisitTimer } from "@/components/visit-timer";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function PatientPage({
   params,
@@ -77,291 +93,302 @@ export default async function PatientPage({
 
   const latestEsas = patient.esasScores.at(-1);
   const latestPps = patient.ppsScores.at(-1);
+  const patientName = fullName(patient);
 
   return (
-    <div className="space-y-6">
-      <RecentPatientTracker patient={{ id: patient.id, name: fullName(patient), mrn: patient.mrn }} />
-      <div className="flex items-start justify-between">
-        <div>
-          <Link href="/patients" className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline">
-            ← All patients
-          </Link>
-          <h1 className="text-3xl font-bold text-slate-900 mt-1">{fullName(patient)}</h1>
-          <p className="text-sm font-medium text-slate-700 mt-1">
-            MRN <span className="font-mono">{patient.mrn}</span> · {ageFrom(patient.dob)}y · {patient.sex ?? "—"} ·{" "}
-            <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">{patient.codeStatus.replace(/_/g, "/")}</span>
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <a
-            href={`/api/patients/${patient.id}/export?format=pdf`}
-            className="border border-stone-300 text-slate-800 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-100 transition-colors"
-          >
-            PDF
-          </a>
-          <a
-            href="#voice-recorder"
-            className="bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-800 shadow-sm transition-colors"
-          >
-            🎤 Record Note
-          </a>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <RecentPatientTracker patient={{ id: patient.id, name: patientName, mrn: patient.mrn }} />
 
-      {patient.lockbox && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          🔒 Lockbox patient — access requires break-glass reason
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Overview card */}
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
-          <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">
-            Overview
-          </h2>
-          <Row label="Primary Dx" value={patient.primaryDx ?? "—"} />
-          <Row label="ICD-10" value={patient.primaryDxIcd ?? "—"} mono />
-          <Row label="Level of Care" value={patient.levelOfCare.replace(/_/g, " ")} />
-          <Row label="Admitted" value={new Date(patient.admittedAt).toLocaleDateString()} />
-          <Row
-            label="Prognosis"
-            value={patient.prognosisMo ? `${patient.prognosisMo} months` : "—"}
-          />
-          <Row label="Consent" value={patient.consentOnFile ? "✓ On file" : "Missing"} />
+      <section className="panel overflow-hidden">
+        <div className="flex flex-col gap-4 bg-[var(--surface)] p-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <Link href="/patients" className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 hover:text-teal-900">
+              <ArrowLeft className="h-4 w-4" />
+              All patients
+            </Link>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-black tracking-tight text-slate-900">{patientName}</h1>
+              <span className="badge badge-warning">{patient.codeStatus.replace(/_/g, "/")}</span>
+              {patient.lockbox && (
+                <span className="badge badge-danger">
+                  <LockKeyhole className="h-3.5 w-3.5" />
+                  Lockbox
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              MRN <span className="font-mono text-slate-900">{patient.mrn}</span> / {ageFrom(patient.dob)}y /{" "}
+              {patient.sex ?? "Sex not recorded"} / {patient.levelOfCare.replace(/_/g, " ")}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/api/patients/${patient.id}/export?format=pdf`}
+              className="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm"
+            >
+              <Download className="h-4 w-4" />
+              PDF
+            </a>
+            <a href="#voice-recorder" className="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm shadow-sm">
+              <Mic className="h-4 w-4" />
+              Record Note
+            </a>
+          </div>
         </div>
 
-        {/* Latest scores */}
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-3">
-          <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">
-            Latest Scores
-          </h2>
-          {latestPps ? (
-            <div>
-              <div className="text-xs text-slate-500">PPS</div>
-              <div className="text-3xl font-semibold">{latestPps.score}%</div>
-              <div className="text-xs text-slate-400">
-                {new Date(latestPps.recordedAt).toLocaleDateString()}
+        {patient.lockbox && (
+          <div className="border-t border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-800">
+            <span className="inline-flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4" />
+              Lockbox patient - access requires break-glass reason.
+            </span>
+          </div>
+        )}
+      </section>
+
+      <div className="patient-workspace">
+        <main className="min-w-0 space-y-5">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="panel p-5">
+              <SectionTitle icon={<Stethoscope className="h-4 w-4" />} title="Clinical summary" />
+              <div className="mt-4 space-y-3">
+                <Row label="Primary Dx" value={patient.primaryDx ?? "Not recorded"} />
+                <Row label="ICD-10" value={patient.primaryDxIcd ?? "Not recorded"} mono />
+                <Row label="Admitted" value={new Date(patient.admittedAt).toLocaleDateString()} />
+                <Row label="Prognosis" value={patient.prognosisMo ? `${patient.prognosisMo} months` : "Not recorded"} />
+                <Row label="Consent" value={patient.consentOnFile ? "On file" : "Missing"} />
               </div>
             </div>
-          ) : (
-            <div className="text-sm text-slate-400">No PPS recorded</div>
-          )}
-          {latestEsas && (
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-xs text-slate-500 mb-1">ESAS (latest)</div>
-              <div className="grid grid-cols-3 gap-1 text-xs">
-                <ESASCell label="Pain" v={latestEsas.pain} />
-                <ESASCell label="Fatigue" v={latestEsas.tiredness} />
-                <ESASCell label="Nausea" v={latestEsas.nausea} />
-                <ESASCell label="Drowsy" v={latestEsas.drowsiness} />
-                <ESASCell label="Appetite" v={latestEsas.appetite} />
-                <ESASCell label="SOB" v={latestEsas.shortBreath} />
-                <ESASCell label="Dep." v={latestEsas.depression} />
-                <ESASCell label="Anx." v={latestEsas.anxiety} />
-                <ESASCell label="Well." v={latestEsas.wellbeing} />
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Allergies + Caregivers */}
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
-          <div>
-            <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
-              Allergies
-            </h2>
-            {patient.allergies.length === 0 ? (
-              <div className="text-sm text-slate-400">NKDA</div>
-            ) : (
-              <ul className="text-sm space-y-1">
-                {patient.allergies.map((a) => (
-                  <li key={a.id} className="flex justify-between">
-                    <span>{a.substance}</span>
-                    <span className="text-xs text-red-600">{a.severity ?? ""}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
-              Caregivers
-            </h2>
-            {patient.contacts.length === 0 ? (
-              <div className="text-sm text-slate-400">None on file</div>
-            ) : (
-              <ul className="text-sm space-y-1">
-                {patient.contacts.map((c) => (
-                  <li key={c.id}>
-                    <span className="font-medium">{c.name}</span>
-                    {c.relationship && (
-                      <span className="text-slate-500"> · {c.relationship}</span>
-                    )}
-                    {c.isPrimary && (
-                      <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                        Primary
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <PatientClinicalForms
-        patientId={patient.id}
-        canAddMedication={can(session?.user.role, "med.prescribe")}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-          <SummaryCard patientId={patient.id} />
-        </div>
-        <VisitTimer patientId={patient.id} />
-      </div>
-
-      {/* Charts */}
-      {patient.esasScores.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-            <h2 className="text-sm font-bold text-slate-900 mb-3">ESAS Trend</h2>
-            <ESASChart data={patient.esasScores} />
-          </div>
-          <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-            <h2 className="text-sm font-bold text-slate-900 mb-3">PPS Trend</h2>
-            <PPSChart data={patient.ppsScores} />
-          </div>
-        </div>
-      )}
-
-      {/* Voice note recorder */}
-      <div id="voice-recorder" className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 scroll-mt-20">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">
-          🎤 Voice Note → SOAP
-        </h2>
-        <VoiceNoteRecorder patientId={patient.id} />
-      </div>
-
-      {/* Medications */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">
-          Active Medications ({patient.meds.length})
-        </h2>
-        {patient.meds.length === 0 ? (
-          <div className="text-sm text-slate-400">None</div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {patient.meds.map((m) => (
-              <li key={m.id} className="py-2 text-sm flex justify-between items-center">
+            <div className="panel p-5">
+              <SectionTitle icon={<Users className="h-4 w-4" />} title="Care network" />
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <span className="font-medium">{m.name}</span>
-                  <span className="text-slate-500">
-                    {" "}
-                    {m.dose}
-                    {m.route ? ` ${m.route}` : ""}
-                    {m.frequency ? ` ${m.frequency}` : ""}
-                  </span>
-                  {m.indication && (
-                    <span className="text-xs text-slate-400"> — {m.indication}</span>
+                  <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Allergies</div>
+                  {patient.allergies.length === 0 ? (
+                    <span className="badge badge-success">NKDA</span>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {patient.allergies.map((allergy) => (
+                        <li key={allergy.id} className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                          <span className="font-bold">{allergy.substance}</span>
+                          {allergy.severity && <span className="badge badge-danger">{allergy.severity}</span>}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-                {m.controlled && (
-                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">
-                    Controlled
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-          <h2 className="text-sm font-bold text-slate-900 mb-3">Drug Interaction Check</h2>
-          <InteractionsPanel patientId={patient.id} />
-        </div>
-        <PatientActions patientId={patient.id} isAdmin={session?.user.role === "ADMIN"} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-          <FamilyLetter patientId={patient.id} />
-        </div>
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">Photos</h2>
-          </div>
-          <PhotoUpload patientId={patient.id} />
-          {patient.photos.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {patient.photos.map((photo) => (
-                <a key={photo.id} href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/photos/${photo.id}`} alt={photo.caption ?? photo.filename} className="aspect-square w-full object-cover rounded-lg border border-stone-200" />
-                  <div className="mt-1 text-xs text-slate-600 truncate">{photo.caption ?? photo.filename}</div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent notes */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">Recent Notes</h2>
-        {patient.clinicalNotes.length === 0 ? (
-          <div className="text-sm text-slate-400">No notes yet</div>
-        ) : (
-          <ul className="space-y-3">
-            {patient.clinicalNotes.map((n) => (
-              <li key={n.id} className="border-l-2 border-slate-200 pl-3">
-                <div className="text-xs text-slate-500 flex gap-2">
-                  <span>{new Date(n.createdAt).toLocaleString()}</span>
-                  <span>·</span>
-                  <span>
-                    {n.author.name} ({n.author.role})
-                  </span>
-                  {n.signed && <span className="text-green-600">· ✓ signed</span>}
+                <div>
+                  <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Caregivers</div>
+                  {patient.contacts.length === 0 ? (
+                    <span className="text-sm font-semibold text-slate-500">None on file</span>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {patient.contacts.map((contact) => (
+                        <li key={contact.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                          <span className="font-bold">{contact.name}</span>
+                          {contact.relationship && <span className="text-slate-500"> / {contact.relationship}</span>}
+                          {contact.isPrimary && <span className="ml-2 badge badge-success">Primary</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                {n.assessment && (
-                  <div className="text-sm mt-1">
-                    <span className="font-medium">A:</span> {n.assessment}
-                  </div>
-                )}
-                {n.plan && (
-                  <div className="text-sm text-slate-600">
-                    <span className="font-medium">P:</span> {n.plan}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+            </div>
+          </section>
+
+          <PatientClinicalForms patientId={patient.id} canAddMedication={can(session?.user.role, "med.prescribe")} />
+
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="panel p-5 xl:col-span-2">
+              <SummaryCard patientId={patient.id} />
+            </div>
+            <VisitTimer patientId={patient.id} />
+          </section>
+
+          {patient.esasScores.length > 0 && (
+            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="panel p-5">
+                <SectionTitle icon={<Activity className="h-4 w-4" />} title="ESAS trend" />
+                <div className="mt-4">
+                  <ESASChart data={patient.esasScores} />
+                </div>
+              </div>
+              <div className="panel p-5">
+                <SectionTitle icon={<HeartPulse className="h-4 w-4" />} title="PPS trend" />
+                <div className="mt-4">
+                  <PPSChart data={patient.ppsScores} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section id="voice-recorder" className="scroll-mt-24">
+            <VoiceNoteRecorder patientId={patient.id} />
+          </section>
+
+          <section className="panel p-5">
+            <SectionTitle icon={<Pill className="h-4 w-4" />} title={`Active medications (${patient.meds.length})`} />
+            {patient.meds.length === 0 ? (
+              <EmptyState icon={Pill} title="No active medications" hint="Medication orders will appear here once added." />
+            ) : (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {patient.meds.map((med) => (
+                  <li key={med.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                    <div>
+                      <span className="font-black text-slate-900">{med.name}</span>
+                      <span className="ml-2 font-semibold text-slate-500">
+                        {med.dose}
+                        {med.route ? ` ${med.route}` : ""}
+                        {med.frequency ? ` ${med.frequency}` : ""}
+                      </span>
+                      {med.indication && <span className="ml-2 text-xs font-semibold text-slate-400">- {med.indication}</span>}
+                    </div>
+                    {med.controlled && <span className="badge badge-danger">Controlled</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="panel p-5">
+              <SectionTitle icon={<Activity className="h-4 w-4" />} title="Drug interaction check" />
+              <div className="mt-4">
+                <InteractionsPanel patientId={patient.id} />
+              </div>
+            </div>
+            <PatientActions patientId={patient.id} isAdmin={session?.user.role === "ADMIN"} />
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="panel p-5">
+              <FamilyLetter patientId={patient.id} />
+            </div>
+            <div className="panel space-y-4 p-5">
+              <SectionTitle icon={<Camera className="h-4 w-4" />} title="Photos" />
+              <PhotoUpload patientId={patient.id} />
+              {patient.photos.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {patient.photos.map((photo) => (
+                    <a key={photo.id} href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/api/photos/${photo.id}`} alt={photo.caption ?? photo.filename} className="aspect-square w-full rounded-lg border border-stone-200 object-cover" />
+                      <div className="mt-1 truncate text-xs font-semibold text-slate-600">{photo.caption ?? photo.filename}</div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={Camera} title="No photos yet" hint="Wound and care photos will appear here after upload." />
+              )}
+            </div>
+          </section>
+
+          <section className="panel p-5">
+            <SectionTitle icon={<FileText className="h-4 w-4" />} title="Recent notes" />
+            {patient.clinicalNotes.length === 0 ? (
+              <EmptyState icon={FileText} title="No notes yet" hint="Record a visit note to start the clinical timeline." />
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {patient.clinicalNotes.map((note) => (
+                  <li key={note.id} className="rounded-lg border border-slate-200 bg-[var(--surface-muted)] p-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
+                      <span>{new Date(note.createdAt).toLocaleString()}</span>
+                      <span>/</span>
+                      <span>
+                        {note.author.name} ({note.author.role})
+                      </span>
+                      {note.signed && (
+                        <span className="badge badge-success">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          signed
+                        </span>
+                      )}
+                    </div>
+                    {note.assessment && (
+                      <div className="mt-2 text-sm">
+                        <span className="font-black">A:</span> {note.assessment}
+                      </div>
+                    )}
+                    {note.plan && (
+                      <div className="mt-1 text-sm text-slate-600">
+                        <span className="font-black">P:</span> {note.plan}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </main>
+
+        <aside className="vitals-rail space-y-4">
+          <section className="panel p-4">
+            <SectionTitle icon={<HeartPulse className="h-4 w-4" />} title="Vitals rail" />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Metric label="PPS" value={latestPps ? `${latestPps.score}%` : "--"} detail={latestPps ? new Date(latestPps.recordedAt).toLocaleDateString() : "No score"} />
+              <Metric label="ESAS pain" value={latestEsas ? String(latestEsas.pain) : "--"} detail={latestEsas ? "Latest score" : "No score"} />
+              <Metric label="Code" value={patient.codeStatus.replace(/_/g, "/")} detail="Order status" />
+              <Metric label="LOC" value={patient.levelOfCare.replace(/_/g, " ")} detail="Level of care" />
+            </div>
+            {latestEsas && (
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">ESAS latest</div>
+                <div className="grid grid-cols-3 gap-1 text-xs">
+                  <ESASCell label="Pain" v={latestEsas.pain} />
+                  <ESASCell label="Fatigue" v={latestEsas.tiredness} />
+                  <ESASCell label="Nausea" v={latestEsas.nausea} />
+                  <ESASCell label="Drowsy" v={latestEsas.drowsiness} />
+                  <ESASCell label="Appetite" v={latestEsas.appetite} />
+                  <ESASCell label="SOB" v={latestEsas.shortBreath} />
+                  <ESASCell label="Dep." v={latestEsas.depression} />
+                  <ESASCell label="Anx." v={latestEsas.anxiety} />
+                  <ESASCell label="Well." v={latestEsas.wellbeing} />
+                </div>
+              </div>
+            )}
+          </section>
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700">{icon}</span>
+      <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">{title}</h2>
     </div>
   );
 }
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-slate-600 font-medium">{label}</span>
-      <span className={mono ? "font-mono text-xs text-slate-900" : "text-slate-900 font-semibold"}>{value}</span>
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="font-semibold text-slate-600">{label}</span>
+      <span className={mono ? "font-mono text-xs font-bold text-slate-900" : "text-right font-black text-slate-900"}>{value}</span>
+    </div>
+  );
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="metric-tile">
+      <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 break-words text-xl font-black text-slate-900">{value}</div>
+      <div className="mt-1 text-[11px] font-semibold text-slate-500">{detail}</div>
     </div>
   );
 }
 
 function ESASCell({ label, v }: { label: string; v: number }) {
-  const color =
-    v >= 7 ? "bg-red-100 text-red-700" : v >= 4 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
+  const color = v >= 7 ? "badge-danger" : v >= 4 ? "badge-warning" : "badge-success";
   return (
-    <div className={`${color} rounded px-1.5 py-1 text-center`}>
-      <div className="text-[10px] uppercase tracking-wider opacity-75">{label}</div>
-      <div className="font-semibold">{v}</div>
+    <div className={`${color} rounded-lg px-1.5 py-1 text-center`}>
+      <div className="text-[10px] uppercase tracking-wide opacity-75">{label}</div>
+      <div className="font-black">{v}</div>
     </div>
   );
 }

@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CheckCircle2, ShieldAlert } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonLines } from "@/components/ui/skeleton";
 
 type Alert = {
   severity: "high" | "moderate" | "low";
@@ -22,48 +26,22 @@ export function InteractionsPanel({ patientId }: { patientId: string }) {
       .finally(() => setLoading(false));
   }, [patientId]);
 
-  if (loading) {
-    return <div className="text-sm text-slate-500">Checking interactions...</div>;
-  }
-  if (!alerts || alerts.length === 0) {
-    return (
-      <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-3 font-medium">
-        ✓ No known interactions detected.
-      </div>
-    );
-  }
+  if (loading) return <SkeletonLines lines={3} />;
+  if (!alerts || alerts.length === 0) return <EmptyState icon={CheckCircle2} title="No known interactions" />;
 
   return (
     <ul className="space-y-2">
       {alerts.map((a, i) => (
-        <li
-          key={i}
-          className={`rounded-lg p-3 border ${
-            a.severity === "high"
-              ? "bg-red-50 border-red-300"
-              : a.severity === "moderate"
-                ? "bg-amber-50 border-amber-300"
-                : "bg-slate-50 border-slate-300"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <span
-              className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
-                a.severity === "high"
-                  ? "bg-red-200 text-red-900"
-                  : a.severity === "moderate"
-                    ? "bg-amber-200 text-amber-900"
-                    : "bg-slate-200 text-slate-800"
-              }`}
-            >
+        <li key={i} className="rounded-lg border hairline bg-[var(--surface-muted)] p-3">
+          <div className="mb-1 flex items-center gap-2">
+            <Badge tone={a.severity === "high" ? "danger" : a.severity === "moderate" ? "warning" : "neutral"}>
+              <ShieldAlert className="h-3.5 w-3.5" />
               {a.severity}
-            </span>
-            <span className="font-semibold text-sm text-slate-900">
-              {a.drugA} × {a.drugB}
-            </span>
-            <span className="text-xs text-slate-500 ml-auto">{a.source}</span>
+            </Badge>
+            <span className="text-sm font-semibold">{a.drugA} x {a.drugB}</span>
+            <span className="ml-auto text-xs soft">{a.source}</span>
           </div>
-          <p className="text-sm text-slate-800">{a.message}</p>
+          <p className="text-sm muted">{a.message}</p>
         </li>
       ))}
     </ul>

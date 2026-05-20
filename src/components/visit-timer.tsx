@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { TimerReset } from "lucide-react";
 
 export function VisitTimer({ patientId }: { patientId: string }) {
   const key = `hospice-emr-visit-timer-${patientId}`;
@@ -43,18 +44,23 @@ export function VisitTimer({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div className="surface-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xs font-bold text-teal-700 uppercase tracking-wider">Visit Timer</h2>
-          <div className="mt-1 text-3xl font-mono font-bold text-slate-900">{elapsed}</div>
+          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide soft">
+            <TimerReset className="h-4 w-4 text-[var(--primary)]" />
+            Visit timer
+          </h2>
+          <div key={elapsed} className="timer-digits mt-1 text-3xl font-bold tabular-nums">
+            {elapsed}
+          </div>
         </div>
         {startedAt ? (
-          <button type="button" onClick={stop} className="px-3 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800">
+          <button type="button" onClick={stop} className="btn-secondary px-3 py-2 text-sm">
             Stop
           </button>
         ) : (
-          <button type="button" onClick={start} className="px-3 py-2 rounded-lg text-sm font-semibold bg-teal-700 text-white hover:bg-teal-800">
+          <button type="button" onClick={start} className="btn-primary px-3 py-2 text-sm">
             Start
           </button>
         )}

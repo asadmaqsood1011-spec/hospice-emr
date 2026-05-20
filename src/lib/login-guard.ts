@@ -56,5 +56,5 @@ export async function recordLoginSuccess(userId: string) {
 }
 
 export function clinicalRoleNeedsTotp(role: string | undefined | null) {
-  return role === "ADMIN" || role === "MD" || role === "RN" || role === "SW" || role === "CHAPLAIN";
+  return role === "MD" || role === "RN" || role === "SW" || role === "CHAPLAIN";
 }

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   FileSearch,
+  Inbox,
   KeyRound,
   Pill,
   Search,
@@ -17,6 +18,7 @@ import {
 
 const COMMANDS = [
   { label: "Patients", href: "/patients", icon: Users },
+  { label: "Referrals", href: "/referrals", icon: Inbox },
   { label: "Visits", href: "/visits", icon: CalendarDays },
   { label: "On-call handoff", href: "/on-call", icon: ClipboardList },
   { label: "Controlled substances", href: "/controlled-substances", icon: Pill },

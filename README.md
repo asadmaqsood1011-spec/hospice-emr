@@ -6,13 +6,26 @@
 
 ## Why This Exists
 
-US hospice teams still run too much of the bedside-to-back-office workflow on paper, fax, and 2005-era EMRs. Epic and Cerner are built for acute care and cost millions. This is a small, single-clinic EMR designed around the hospice nurse home visit workflow: dictate at the bedside, AI handles the typing.
+US hospice teams still run too much of the bedside-to-back-office workflow on paper, fax, and 2005-era EMRs. Epic and Cerner are built for acute care and cost millions. This product goal is now bigger than a documentation add-on: become a full incumbent killer for US hospice, starting with a better field-nurse workflow and expanding into the operational, regulatory, billing, IDG, medication, and family-care workflows needed to replace legacy hospice EMRs.
 
 **Differentiators:**
 - Voice-first: Whisper transcribes, GPT-4o structures into SOAP + extracts ESAS/PPS/meds
 - Hospice-specific data model: PPS, ESAS-r, level of care, code status, prognosis attestation
 - Immutable audit log on every PHI access
 - Single-clinic deployment, multi-role RBAC (Admin/MD/RN/SW/Chaplain/Aide/Volunteer)
+
+## Product Ambition
+
+Goal: **full incumbent killer**, not only an AI documentation layer.
+
+The app should compete with legacy hospice platforms by owning the full hospice operating loop:
+
+- Field visit documentation, voice notes, photos, ESAS/PPS, and nurse sign-off
+- Referral/intake, admission, eligibility, consent, and medication reconciliation
+- CMS 485 / plan of care, IDG meeting notes, recertification, and bereavement tracking
+- Controlled-substance logs, on-call handoffs, visit scheduling, and care coordination
+- Billing/compliance-ready exports, audit review, quality measures, and admin operations
+- Interop where it matters: eRx, labs/docs/fax/referrals, FHIR/HL7 only when buyer pull exists
 
 ## Stack
 
@@ -115,18 +128,25 @@ prisma/
 
 ## Roadmap
 
-- [ ] Patient admit form (`/patients/new`)
-- [ ] Visit scheduling
-- [ ] CMS 485 Plan of Care form
-- [ ] IDG meeting note w/ speaker diarization
-- [ ] Drug interaction check (OpenFDA + custom hospice rules)
-- [ ] Offline PWA + sync (home visits w/ no signal)
-- [ ] HL7/FHIR endpoint (talk to hospitals)
-- [ ] e-Fax inbound (Twilio/Phaxio)
-- [ ] PDF chart export for handoffs/audits
-- [ ] 2FA (TOTP) on all accounts
-- [ ] Break-glass UI w/ mandatory reason
-- [ ] Bereavement tracking (13-month post-death)
+### Incumbent-killer sequence
+
+1. Medication reconciliation for admit/transfer/discharge and high-risk med changes.
+2. CMS 485 / plan of care and hospice eligibility workflow.
+3. IDG meeting note with agenda, disciplines, action items, and signed minutes.
+4. Referral/intake pipeline with admission readiness and missing-document tracking.
+5. Billing and Medicare hospice operational reports.
+6. Bereavement tracking and family communication controls.
+7. eRx / pharmacy / DME / lab-document integrations as buyer demand proves them.
+
+### Existing platform base
+
+- Voice -> SOAP workflow
+- Patient chart, ESAS/PPS, meds, allergies, contacts, notes, private photos
+- Audit log, RBAC, 2FA, lockbox/break-glass
+- Controlled-substance ledger
+- On-call handoff board
+- Quality dashboard and trajectory triage
+- PDF/JSON chart export
 
 ## License
 
@@ -134,4 +154,4 @@ MIT — see [LICENSE](./LICENSE)
 
 ## Disclaimer
 
-This software is **not a certified medical device** and has **not undergone clinical validation**. Do not use for real patient care without a Privacy Impact Assessment, legal review, and clinical sign-off. Demo data only.
+This software is **not a certified medical device** and has **not undergone clinical validation**. Do not use for real patient care without HIPAA legal review, vendor BAAs, security risk analysis, clinical sign-off, and operational policies. Demo data only.

@@ -65,6 +65,14 @@ enum AuditAction {
   BREAK_GLASS
 }
 
+enum ReferralStatus {
+  NEW
+  NEEDS_INFO
+  READY_TO_ADMIT
+  ADMITTED
+  DECLINED
+}
+
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
@@ -123,6 +131,35 @@ model Patient {
   auditLogs     AuditLog[]
   photos        Photo[]
   faxes         Fax[]
+  sourceReferrals Referral[] @relation("ConvertedReferral")
+}
+
+model Referral {
+  id               String         @id @default(cuid())
+  status           ReferralStatus @default(NEW)
+  source           String?
+  referredAt       DateTime       @default(now())
+  firstName        String
+  lastName         String
+  dob              DateTime?
+  phone            String?
+  primaryDx        String?
+  primaryDxIcd     String?
+  payer            String?
+  caregiverName    String?
+  caregiverPhone   String?
+  hospiceEligible  Boolean        @default(false)
+  consentReady     Boolean        @default(false)
+  documentsReady   Boolean        @default(false)
+  notes            String?
+  convertedPatientId String?
+  convertedPatient Patient?       @relation("ConvertedReferral", fields: [convertedPatientId], references: [id])
+  createdBy        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([status, referredAt])
+  @@index([convertedPatientId])
 }
 
 model Caregiver {

@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ChevronDown,
   ClipboardList,
+  Inbox,
   KeyRound,
   LogOut,
   Pill,
@@ -21,6 +22,7 @@ import {
 
 const navItems = [
   { href: "/patients", label: "Patients", icon: Users, show: "always" },
+  { href: "/referrals", label: "Referrals", icon: Inbox, show: "always" },
   { href: "/visits", label: "Visits", icon: CalendarDays, show: "always" },
   { href: "/on-call", label: "On-call", icon: ClipboardList, show: "lg" },
   { href: "/controlled-substances", label: "Med log", icon: Pill, show: "xl" },
@@ -121,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <footer className="hidden border-t hairline bg-[var(--surface)] sm:block">
         <div className="mx-auto flex max-w-[1500px] justify-between px-4 py-3 text-xs muted sm:px-6">
-          <span className="font-medium">PHIPA-aware. Audit-logged. Session 15 min idle.</span>
+          <span className="font-medium">HIPAA-ready. Audit-logged. Session 15 min idle.</span>
           <span>All access is recorded</span>
         </div>
       </footer>

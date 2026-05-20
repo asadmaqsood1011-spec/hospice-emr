@@ -254,8 +254,10 @@ model Photo {
   mimeType   String
   bytes      Int
   createdAt  DateTime @default(now())
+  deletedAt  DateTime?
 
   @@index([patientId, takenAt])
+  @@index([patientId, deletedAt])
 }
 
 model Fax {

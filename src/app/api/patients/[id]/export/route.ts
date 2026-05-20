@@ -36,7 +36,7 @@ export async function GET(
         take: NOTE_CAP,
         include: { author: { select: { name: true, role: true } } },
       },
-      photos: { take: 100, orderBy: { takenAt: "desc" } },
+      photos: { where: { deletedAt: null }, take: 100, orderBy: { takenAt: "desc" } },
     },
   });
 

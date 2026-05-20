@@ -29,6 +29,7 @@ import { FamilyLetter } from "@/components/family-letter";
 import { InteractionsPanel } from "@/components/interactions-panel";
 import { PatientActions } from "@/components/patient-actions";
 import { PatientClinicalForms } from "@/components/patient-clinical-forms";
+import { PhotoDeleteButton } from "@/components/photo-delete-button";
 import { PhotoUpload } from "@/components/photo-upload";
 import { RecentPatientTracker } from "@/components/recent-patients";
 import { SummaryCard } from "@/components/summary-card";
@@ -76,7 +77,7 @@ export default async function PatientPage({
         take: 10,
         include: { author: { select: { name: true, role: true } } },
       },
-      photos: { orderBy: { takenAt: "desc" }, take: 6 },
+      photos: { where: { deletedAt: null }, orderBy: { takenAt: "desc" }, take: 6 },
     },
   });
 
@@ -272,11 +273,14 @@ export default async function PatientPage({
               {patient.photos.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {patient.photos.map((photo) => (
-                    <a key={photo.id} href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={`/api/photos/${photo.id}`} alt={photo.caption ?? photo.filename} className="aspect-square w-full rounded-lg border border-stone-200 object-cover" />
-                      <div className="mt-1 truncate text-xs font-semibold text-slate-600">{photo.caption ?? photo.filename}</div>
-                    </a>
+                    <div key={photo.id} className="group relative">
+                      <a href={`/api/photos/${photo.id}`} target="_blank" rel="noreferrer" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/api/photos/${photo.id}`} alt={photo.caption ?? photo.filename} className="aspect-square w-full rounded-lg border border-stone-200 object-cover" />
+                        <div className="mt-1 truncate text-xs font-semibold text-slate-600">{photo.caption ?? photo.filename}</div>
+                      </a>
+                      <PhotoDeleteButton photoId={photo.id} />
+                    </div>
                   ))}
                 </div>
               ) : (

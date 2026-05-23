@@ -60,13 +60,13 @@ export async function buildChartPdf(input: ChartPdfInput): Promise<Uint8Array> {
 
   function heading(text: string, color = teal) {
     ensure(2);
-    page.drawText(text, { x: margin, y, size: 14, font: bold, color });
+    page.drawText(sanitize(text), { x: margin, y, size: 14, font: bold, color });
     y -= 18;
   }
 
   function line(text: string, color = slate, size = 10) {
     ensure(1);
-    const wrapped = wrap(text, font, size, width);
+    const wrapped = wrap(sanitize(text), font, size, width);
     for (const w of wrapped) {
       page.drawText(w, { x: margin, y, size, font, color });
       y -= size + 4;
@@ -75,8 +75,8 @@ export async function buildChartPdf(input: ChartPdfInput): Promise<Uint8Array> {
 
   function kv(k: string, v: string) {
     ensure(1);
-    page.drawText(k, { x: margin, y, size: 10, font: bold, color: muted });
-    page.drawText(v, { x: margin + 130, y, size: 10, font, color: slate });
+    page.drawText(sanitize(k), { x: margin, y, size: 10, font: bold, color: muted });
+    page.drawText(sanitize(v), { x: margin + 130, y, size: 10, font, color: slate });
     y -= 14;
   }
 
@@ -119,7 +119,7 @@ export async function buildChartPdf(input: ChartPdfInput): Promise<Uint8Array> {
   for (const n of input.notes) {
     ensure(6);
     line(
-      `${n.createdAt.toISOString().slice(0, 16).replace("T", " ")}  ·  ${n.author?.name ?? ""} (${n.author?.role ?? ""})${n.signed ? "  ✓ signed" : "  [draft]"}`,
+      `${n.createdAt.toISOString().slice(0, 16).replace("T", " ")}  ·  ${n.author?.name ?? ""} (${n.author?.role ?? ""})${n.signed ? "  [signed]" : "  [draft]"}`,
       muted,
       9
     );
@@ -134,10 +134,10 @@ export async function buildChartPdf(input: ChartPdfInput): Promise<Uint8Array> {
   const pages = doc.getPages();
   pages.forEach((p, i) => {
     p.drawText(
-      `Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} — Page ${i + 1}/${pages.length}`,
+      sanitize(`Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} - Page ${i + 1}/${pages.length}`),
       { x: margin, y: 30, size: 8, font, color: muted }
     );
-    p.drawText("CONFIDENTIAL — PHIPA-protected health information", {
+    p.drawText(sanitize("CONFIDENTIAL - PHIPA-protected health information"), {
       x: 612 - margin - 220,
       y: 30,
       size: 8,
@@ -147,6 +147,30 @@ export async function buildChartPdf(input: ChartPdfInput): Promise<Uint8Array> {
   });
 
   return doc.save();
+}
+
+// pdf-lib StandardFonts use WinAnsi encoding — drawText throws on any char outside it
+// (emoji, CJK, arrows, checkmarks, etc.). Map a few common ones, strip the rest to "?".
+function sanitize(text: string): string {
+  if (!text) return text;
+  const map: Record<string, string> = {
+    "‘": "'", "’": "'", "“": '"', "”": '"',
+    "–": "-", "—": "-", "…": "...",
+    "→": "->", "←": "<-", "✓": "[x]", "✗": "[ ]", "•": "*",
+    " ": " ",
+  };
+  let out = "";
+  for (const ch of text) {
+    if (map[ch] !== undefined) { out += map[ch]; continue; }
+    const code = ch.codePointAt(0) ?? 0;
+    // WinAnsi safe range: printable ASCII + Latin-1 supplement, minus C1 controls.
+    if ((code >= 0x20 && code <= 0x7E) || (code >= 0xA0 && code <= 0xFF) || ch === "\n") {
+      out += ch;
+    } else {
+      out += "?";
+    }
+  }
+  return out;
 }
 
 function wrap(text: string, font: import("pdf-lib").PDFFont, size: number, maxWidth: number): string[] {
